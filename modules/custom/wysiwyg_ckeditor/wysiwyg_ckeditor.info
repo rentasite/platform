@@ -1,0 +1,9 @@
+core = 7.x
+dependencies[] = "imce"
+dependencies[] = "imce_wysiwyg"
+dependencies[] = "wysiwyg"
+description = "Setting up ckeditor as wysiwyg editor for the full html input format"
+name = "Wysiwyg CKEditor"
+package = User interface
+project = "wysiwyg_ckeditor"
+version = "7.x-0.1"

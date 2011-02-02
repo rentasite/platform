@@ -1,0 +1,54 @@
+<?php
+
+function wysiwyg_ckeditor_wysiwyg_editor_settings_alter(&$settings, &$context) {
+  if ($context['profile']->editor == 'ckeditor') {
+    drupal_add_css(drupal_get_path('module', 'wysiwyg_ckeditor') . '/ckeditor.css');
+    if(isset($settings['toolbar'])) {
+      $toolbar = $settings['toolbar'][0];
+      $bars = $settings['toolbar'] = get_bars();
+      foreach ($bars as $bar_key => $bar) {
+        foreach ($bar as $button_key => $button)
+        {
+          if (!in_array($button, $toolbar)){
+            unset($settings['toolbar'][$bar_key][$button_key]);
+          }
+        }
+        if (empty($settings['toolbar'][$bar_key])) {
+          unset($settings['toolbar'][$bar_key]);
+        }
+      }
+      foreach ($settings['toolbar'] as $bar_key => $bar) {
+        foreach ($bar as $button_key => $button)
+        {
+          $settings['toolbar'][$bar_key] = array_merge(
+            array(),
+            $settings['toolbar'][$bar_key]
+          );
+        }
+      }
+      $settings['toolbar'] = array_merge(array(), $settings['toolbar']);
+    }
+  }
+}
+
+function get_bars(){
+  $bars = array();
+  $bars[] = array('Source');
+  $bars[] = array('Cut', 'Copy', 'Paste', 'PasteText', 'PasteFromWord');
+  $bars[] = array('SpellChecker', 'Scayt');
+  $bars[] = array('Undo', 'Redo');
+  $bars[] = array('Find', 'Replace');
+  $bars[] = array('RemoveFormat', 'SelectAll');
+  $bars[] = array('Bold', 'Italic', 'Underline', 'Strike');
+  $bars[] = array('Superscript', 'Subscript');
+  $bars[] = array('BulletedList', 'NumberedList');
+  $bars[] = array('Outdent', 'Indent', 'Blockquote', 'CreateDiv');
+  $bars[] = array('JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock');
+  $bars[] = array('Link', 'Unlink', 'Anchor');
+  $bars[] = array('Image', 'Flash', 'Table', 'HorizontalRule', 'Smiley', 'SpecialChar', 'break');
+  $bars[] = array('Styles', 'Format', 'Font', 'FontSize');
+  $bars[] = array('TextColor', 'BGColor');
+  $bars[] = array('Maximize', 'ShowBlocks');
+  $bars[] = array('About');
+  return $bars;
+}
