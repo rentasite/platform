@@ -1,0 +1,614 @@
+/* $Id: CHANGELOG.txt,v 1.1.2.24 2009/05/14 12:40:17 skiquel Exp $ */
+
+// **************************************************************************
+//  2009 ********************************************************************
+// **************************************************************************
+
+May --dev
+  - color_user.module - Changed block name from "Choose scheme" to "Site colors"
+  - Removed the legacy warning of using an old color.module theme temporarily.
+
+April --dev
+  - Rounded CSS .hex, .prevbox and .suggested box
+  - .hex input is now set to 60px width
+  - Trying some CSS tweaks so we can do larger label names when editing schemes.
+  - Bug #446056. Changed theme scheme configuration has been changed from MENU_CALLBACK to MENU_LOCAL_TASK.
+  - Reverted to old version of color picker
+  - Allowed keyed themes, for declaring variables by array key instead of going in order.
+  - Removed example themes, linking to them via project page
+
+// **************************************************************************
+//  2008  *******************************************************************
+// **************************************************************************
+
+November --dev
+  In Progress:
+  - Restructuring of code for tiny core + extensions
+  - Color interface rewrite
+
+  Done:
+  - Added messages.css to friendselectric
+  - Created some features to catch errors, added a _color_page_alter() reminder
+  - Created update schema for people upgrading from original color.module
+  - Updated README installation instructions accordingly
+  - Removed more old color.inc files
+  - Updated markup for images
+  - Updated settings from color.inc to hook_color.
+  - Cleaned up documentation in some areas
+  - New tag system
+      Tags are now replaced by having a named tag after the attribute.
+
+        Old usage:
+          color: /* {{tag}} */#FFFFFF/* {{/tag}} */
+
+        New usage:
+          color: #FFFFFF; /* t:tag */
+
+        Do not use spaces in tags, instead seperate words with -
+          Example: body-color-tag
+  - Added cleanstate-tag subtheme to demonstrate tag replacement
+  - Updated tags on friendselectric
+  - Updated tags on nista
+  - #333187 Improve placement of Colorized Druplicon on admin/build/themes
+  - #332458 by dman, toggle all buttons for color picker
+  - #332433 by dman, DB lookup failing to retrieve correct theme info
+
+November 6th, 2008
+  - Re-added missing style file for Garland
+  - #324427 color_compatible rewritten, we're now searching for:
+        color = TRUE
+    inside theme (and eventually module) .info files.
+  - color_list_colorable_themes() removed in lieu of supercharged
+    color_list_themes().
+  - Fixed bug with color_user not showing druplicon icons on non-color themes.
+  - Tried to delete color.inc files.
+  - Bugfix: Splender theme wouldn't work. Fixed outdated splender color info.
+  - Bugfix: Fixed bug where user theme would not change from a colorized theme.
+  - #325612 - color_user: only show user color icon if theme coloring is
+    *enabled* by admin. (For user account preferences)
+  - #324836 _color_page_alter() is now color_preprocess_page(). I did the code
+    myself for it, however JohnAlbin did make a patch.
+      Themer's *no longer* will have to call _color_page_alter in their
+      template.php.
+  - #324502 Code cleanup by JohnAlbin
+  - Merged is_hex() function from github
+  - Merged functionality for special {{DT!}} #hex {{/DT!}} when tag + shift is
+    enabled.
+
+October 1, 2008
+  - Cleanstate completely rewritten w/ Zen and color.module.
+  - Spooner rewritten w/ Zen and color.module
+  - Splender rewritten w/ Zen and color.module
+  - Simpla rewritten w/ Zen and color.module
+  - color_scheme_id_valid now works + will remove old schemes when theme's
+    switch.
+  - Doxy'd up some more code in color.database.inc and removed superfluous
+    arguments.
+  - Fixed bugs with color_user and rewritten parts of the color_page_alter()
+    scheme ID selection.
+  - Cleaned up the doxy where possible. Still trying to work on making code
+    clarity #1.
+  - Changed color_panel_form to color_settings_form. We had to get that done.
+  - #310751 - Fixed PHP 4 compatibility bug with array_combine.
+    http://drupal.org/node/310751
+  - Fixed bug with showing custom_scheme editing, still have a preview
+    functionality bug
+  - Fixed bug with color_user_get_scheme_id() not being found with Color - User
+    is disabled.
+  - Removed old color_get_scheme()
+  - Possibly fixed the preview bug we've been having.
+  - Removed old code from color.generate.inc
+  - Updated form_id in color_user_form_alter() to the new scheme settings form
+    name.
+  - Capitalize first letter of theme in breadcrumb
+
+  New hook_color()
+    Essentially we use hook_color to return the information for colorable
+    material. In the future this could be used for coloring modules and
+    theming stuff.
+    - Updated themes to hook_color() format
+
+  - Fixed black BG's on system admin panels w/ example themes. Themes have had
+    admin panel background colors moved below DO NOT TOUCH declaration.
+
+  (In progress) New color algorithms API
+    When color.module is available there will now be new color processing
+    functions available. Currently we have:
+
+  (In progress) New "extensions" tab panel in color schemes settings.
+
+  Issues
+
+  - #315252 fixed jibberish in documentation
+  - #314591 fixed localization issues with submit buttons. On color_user too.
+
+  To do:
+    - #314568 color_validate()
+
+  On the table:
+    - #315813 extended text fields for hexes
+
+  Bugs:
+  - If webmaster modifies the reference scheme, generation will mess up. Store
+    the reference hex in {color} instead of the reference scheme ID.
+  - Examples themes need to have certain CSS case placed below the DO NOT TOUCH
+    line.
+
+  To do:
+  - (In progress) I want to create a tab in the settings where we can show the
+    current available color.module extensions. :)
+  - (Completed) Move color.inc to a hook_color() in template.php.
+  - (I'm trying, need time!) Module stylesheet manipulation
+  - Theme scheme -> Module scheme linking
+  - (In progress) Make the functions more seeming to an API, particularly with
+    the color changing algorithms.
+  - Take out those PHP notices!
+
+September 17, 2008
+  (Major commit) Polishing, abstracting, extracting, opening, refining.
+
+  Color.inc changes:
+    - 'engine' is now 'replacement methods'
+    - 'schemes' is now 'premade schemes'
+    - 'fill' in images, the first array element will be the image extension to fill with.
+      so far we go 'solid' and 'y-gradient'
+
+  Revamped schema:
+    {color} - Stores theme info
+      |-----------------------------
+      | id  name  type  fields   replacement methods   premade schemes   images   stylesheets ...
+      |  default scheme   reference scheme   blend target   preview
+
+    {color_schemes} - Stores scheme info
+      |-----------------------------
+      | id   name   theme   hex   path   stylesheets   images   screenshot   logo   status
+
+  The idea of keeping an 'extra_attr' and a 'value' to store the lion share of our stuff was getting rather ridiculous.
+
+  Revamped extension system:
+    - You can now add your own custom fill methods!
+    - Files now being included in color/extend/EXTENSIONTYPE/FILE.inc
+      so extend/fill/solid.inc is the solid fill.
+    - The function inside the extension that's used is referred as:
+      _color_extend_EXTENSIONTYPE_EXTENSIONNAME(). So solid.inc is:
+      _color_extend_fill_solid.
+    - Also, if you want to use a dash between words in your ext name,
+      do so, be sure to use dashes in the color.inc fill arg and the
+      extension filename. Inside the function we want undercores.
+    - The markup for fills is now:
+      array('FILLEXTENSION', x, y, width, height, color1, color2...) (you can list
+      unlimited arguments after.
+
+  - User scheme selection has been split into a separate modules
+  - Overhauled cache system
+  - Overhauled color_set_scheme() and color_get_scheme()
+  - Overhauled batch process
+  - Overhauled and simplified color_get_scheme and color_get_theme system to use references
+  - Refined and simplified color_scheme_form() interface and its CSS
+  - New color_get_theme_extras() which only gets called for webmaster's on certain pages to prevent extra queries
+  - Nista has been completely remade. It is now 100% based off Zen, prior to this
+    it was only in some parts. Additionally, we're using the much refreshened Beta 3 release.
+  - Removed unneeded, superfluous functions (such as deprecated color_get_reference())
+  - Changed names of buttons on forms, 'Edit' is now 'Modify'.
+  - Switched position of darken/lighten on scheme editor
+
+  To do:
+    - Open up functions to be more API friendly
+    - Rewrite other themes off Zen theme
+    - Redoxy this code -- much has changed!
+    - Update other variables in code to assure our $scheme and $theme variables are consistent
+      throughout the code. (these variables are arrays of key data, in keys)
+    - TWEAK!
+
+August 30, 2008
+  Gradients and solids are both fills
+
+  - (Clearing ambiguity) 'fill' will now do both gradients and solids. Mention one field if you want a solid color, and 2 field names for a gradient. In accordance with this I have updated the color.inc files on Garland, Minnelli, FriendsElectric and Nista.
+  - (Code stuff) color.database.inc functions split up into color.batch.inc (for batch API) and color.generate.inc (for scheme gen).
+
+August 29, 2008
+  New preview system
+
+  - (Major feature) Previewing. You can now preview schemes before saving (as if it were a node). No more previews.inc.
+    - Removing preview stuff from garland/minnelli.
+    - Updated color.js to remove preview junk
+  - Added (settings) link to the title of the "Scheme options" fieldset in the color scheme panel.
+  - (Setting implementation): status will now work on detecting if scheme is pre-made (0) or admin-made (1)
+  - (User interface) added a .description style to example themes. (Things are much easier to see)
+  - (User interface) moved 'preview' before 'save'
+  - (User interface) 'delete scheme' now 'delete'
+  - (User interface) 'cancel' button available in preview mode
+  - (User interface) 'make default' now 'set as default'
+  - Fixed bug with color.inc snippet scheme names not working
+  - Updated friendselectric schemes. Updated CSS for links.
+
+August 28, 2008
+  - (Bug fix) only give disabled button + text to schemes with a 'status' of 1 (pre-made) where the setting of 'color_modify_premade_schemes' is off.
+  - (Feature) on scheme editing, the theme+scheme will change to the current one you're editing. :)
+  - (Under the hood) Major reworking of scheme generation code. color_add_scheme() has now be made into color_generate_scheme_files(), color_set_scheme() now will work with scheme generation.
+
+  Morning
+  - (Major rehaul) New scheme creation system. Just click "create scheme" and be on your way.
+  - (User experience) Interface changed to fit 'scheme options' inside the square. Consolidating space. :)
+  - (Settings implementation) disabling/enabling of modifying pre-made schemes will now work.
+  - (Bug fixing) color-edit.css: fixed CSS bug in ie6 and ff3
+  - (Polishing) examples/friendselectric/color/color.inc: updated color schemes 'menu-link'
+  - (Polishing) examples/friendselectric/color/page.tpl.php: add pngfix class for pngfix support
+  - (Clearing ambiguity) color_theme_select_submit() is now color_scheme_select_submit
+  - (Clearing ambiguity) color_store_reset() is now color_scheme_reset
+  - (Removing deprecated function) color_check_themes(), color_schemes_generated(), color_theme_generated() removed
+  - (Feature) Users without theme selection enabled (but with color scheme selection) can choose schemes.
+  - (Under the hood) moved variable_set and variable_del to hook_install() and hook_uninstall()
+  - (Under the hood) updated hook_uninstall's color_list_colorable_themes
+  - (Under the hood) color_list_colorable_themes() updated
+  - (Under the hood) updated color.info
+  - (Under the hood) Updated color_set_scheme doxy and removed superflous param
+  - (Under the hood) Scheme 'status' column changed. 0 is default and 1 is webmaster made.
+  - (Documentation) Updated README. It's nice to see I got along to completing some of these ideas. :)
+  - (User experience) Updated drupal_set_messages.
+
+
+  Early hours
+  Polishing + bugfixing
+
+  - (Polishing) System settings menu simplefied
+  - (Polishing) New icon next to colorable themes
+  - (Polishing) Color scheme switching for unregistered users is now officially placed as a demo option.
+  - (Polishing) New friendselectric logo
+  - (Under the hood) Color system form will refresh theme DB and give show compatibility nonn-enabled themes
+  - (Under the hood) /user/{uid}/edit will use cached data
+  - (Under the hood) color_list_themes(), which has been moved to color.database.inc is a function which I kind of want to reccomend for core. It gives an extra param to say if you want to return disabled/enabled themes, you can do a NULL for both.
+
+  I will be beginning the D7 port today.
+
+August 26, 2008
+  Bugfixing for solo-install on a different LAMP installation.
+
+  - (Fixed) bug where batch was ran twice.
+  - (Updated) Garland CSS/inc out of date
+  - (Added) missing farbtastic.js to DRUPAL-6--1
+  - (FriendsElectric) - Removed header corner images which weren't being colored.
+  - (Updated) color.inc examples from 'tag' => '' to 'tag' => TRUE. (makes more sense)
+  - 'default_scheme' is now 'default scheme'
+  - 'reference_scheme' is now 'reference scheme'
+  - 'blend_target' is now 'blend target'
+  - 'transparent_color' is now 'transparent color'
+  - 'img' array is now 'image'
+
+August 25, 2008
+
+  - Was able to get the batch API calls back in color.database.inc
+  - Color picker will now show suggested colors on load
+  - Color picker will now automatically update suggested colors when a new type is picked.
+
+August 24, 2008
+  Midway commit
+
+  - Demonstration theme are being tweaked to look more presentable as colorable themes :)
+  - Updated caching to include "Page compression"
+  - New feature for theme developers, when scheme editing there will be a textfield where devs can have the color.inc code for a scheme to copy and paste right in! Yay! It was simple to do and helpful :)
+  - Updated Nista theme. Updated its schemes. Very nice progress.
+  - Updated Spooner, Cleanstate for text-decoration: none on anchors
+  - Textarea resized for color.inc viewer
+  - Color admin re-factored to conserve space.
+  - (Big improvement) Batch API generation and installer
+  - (System services) Color.module will only attach after it's activated for a theme, or else it will fall back to the default.
+  - Color scheme config panel, admin/settings/schemes
+  - More work is being done to slim the system down and make it more modular.
+
+August 21, 2008
+  - Fixed bug with color.js and Spooner (a base-only scheme)
+  - Updated comments on engine/tag.inc
+  - Updated this README a bit!
+
+August 20, 2008
+  Most of these updates are fixes for the demonstration and documentation.
+  The major exception is the stylesheet engine update.
+
+  - Under the hood: Fixed bug with currenttheme + edit scheme button on color block sending to incorrect theme.
+  - Under the hood: Removed superfluous data from edit_scheme form and submit
+  - Under the hood: Changed permissions around. Color scheme is now available to those with user_access("administer access control")
+  - Under the hood: color_edit_scheme_form() uses $palette instead of $reference to main hue and shift correctly. However, I left a not in the comments to document how $reference and $palette acted with the picker.
+  - Under the hood: color_validate() action to the color_get_theme_info section.
+  - Under the hood: Put spaces around dot's (.) which concatenate
+  - Interface: For intuitive purposes, switching the "select" and "edit" buttons in the color_block_form
+  - Demo Theme -- Simpla: removed extra breadcrumb
+  - Demo Theme -- Friends Electric: Added default logo
+  - Demo Themes -- Fixed font sizes cleanstate and simpla
+  - Demo Users: Including a code of theme's color.inc on theme settings pages so viewers can take a look.
+  - Documentation. On demo themes: Added comments and spruced up the color.inc on the examples more.
+  - Stylesheet changing has been modularized into extensible color replacement engines.
+      - engines/shift.inc - for shift themes, with a 'base' color (Garland)
+      - engines/tag.inc - for custom CSS replacement
+    - In your theme's color.inc, you can use both these engines at once in either order.
+    - Developers can also add custom color replacement algorithms by adding their engines which hook in automatically. Create a engines/yourengine.inc with the function _color_engine_yourengine($style, $info, $palette, $options = NULL). Return the modified $style markup. You can input options in theme schemes (color.inc file) by adding 'yourengine' => array(MYVARS/ARRAY/ETC) to the 'engine' settings. Go crazy. :)
+    - The color.module DON'T TOUCH statement now separates from all engines/modification as expected. The DON'T TOUCH comment is for CSS markup in your stylesheet's you do not want to have colors modified on.
+    - Of course, this means, no more mode-cruft. :)
+
+August 18, 2008 (Firm pencil's down date)
+  Last minute touchups + Code documentation + Demonstration themes
+
+  - markup: fixed bug with extra </div> closing tag in scheme editing caused by preview
+  - block: fixed bug with block on anonymous user scheme block
+  - block: new "edit" button for super-administrator (UID 1), for quick access to scheme
+  - block: "select scheme" is now "select"
+  - block: blocks will no longer show up if scheme info not generated
+  - under the hood: color_find_scheme_by_UID() rewritten
+  - under the hood''fill' now supports unlimited of the same color. markup changed to array(x, y, width, height, color_name)
+  - under the hood: Uninstall and Regenerate will now remove color_theme_* rows in {variable}.
+  - under the hood: fixed bug with incorrect scheme stylesheets being applied to new theme
+  - under the hood: color_validate() check to see if color.inc markup is correct.
+  - under the hood: reworked color_check_themes()
+    - supports array of themes, single theme variable
+    - more efficient algorithm to check
+    - includes support for color_validate()
+  - under the hood: color_theme_scheme_generated() and color_theme_info_generated() return information on if a theme's color has been generated or not
+  - under the hood: functions moved
+    - color_get_theme_info() is now in color.database.inc
+    - color_find_scheme_by_UID() is now color.database.inc
+    - color_store_reset() is now color.database.inc
+    - color_get_ref() is now in color.database.inc. Renamed to color_get_reference()
+    - color_validate() is now in color.misc.inc
+    - Reordered functions in color.module
+  - under the hood: tweaking
+    - color_user() will not include module files if not needed
+  - under the hood: fix theme that show when block view
+  - under the hood: reworked the way logo replacement works. slice or copy a logo.png file for a logo, or mention no logo.png in color.inc and it will use your theme's default logo.png (so you can use it later).
+  - scheme editor: "Previous Colors" is now color history
+  - scheme editor: will now see scheme title. :)
+  - scheme editor: will now see breadcrumb including scheme
+  - scheme editor: "Previous colors" and "Suggested colors" are now in a fieldset with a legend
+  - scheme editor: if no scheme preview CSS or HTML is provided, no preview will be shown
+  - Code: Added doxygen reference to functions
+  - Demonstration themes: Completely redone themes: cleanstate, friendselectric*, nista, simpla, splender, spooner. Upgraded to new color module: Garland, Minnelli. All are featuring full color support and can be used as examples. :)
+
+  * Updated from old 4.7 version (with color support added) -- however this is still bug-prone. There is a width problem in IE7 and button background one in IE6. Just a proof of concept for now. :)
+
+August 8, 2008
+  (#132571) to DRUPAL-6--1
+  - Webmasters can now rename schemes
+  - In theme settings, Edit scheme selectbox will have the default site scheme selected by default.
+  - removed stray console.log() in color.js (was preventing farbtastic from attaching)
+  - Updated the right branch. Apparently the -dev releases haven't updated for a whole month because I was only committing to the HEAD branch.
+  - The "previous colors" (which is our undo function) and suggested colors should be clickable now :)
+
+August 5, 2008
+  (Including Commit #131347)
+  - Now using scheme_id instead of hex values across the module.
+  - Now using an "Official Site Scheme" in the selection.
+  - Base and hybrid schemes will now require a 'reference' scheme.
+    - color_get_palette() is now color_get_theme('ref')
+    - There is now a color_get_theme('fields') for retrieving fields
+  - New theme config option, 'default scheme'
+  - Scheme settings completely renovated.
+    - Interface:
+      - Add scheme fieldset
+      - Default scheme fieldset selection
+      - Edit scheme fieldset selection
+      - Rebuild scheme button
+    - Edit scheme:
+      - Added initial support for last colors, suggested colors -- they are not attached to current focused fields yet.
+      - 'Make default' if scheme isn't site default
+      - Can delete scheme, and save.
+      - Preview is collapsible.
+  - Redoing scheme installation. We will install necessary scheme info to tables before generating them.
+      1.) Populate scheme table with information for generation.
+      2.) Generate schemes one by one
+      3.) For each generated scheme, update row in question
+  - Scheme fields are now placed in an array format.
+  - You can now add schemes -- Remember to press the 'Add scheme' button.
+  - Editing scheme now works
+  - Updated the example files.
+
+July 30, 2008
+  More leaps
+
+  - (Bug) Fixed gradient preview
+  - (Bug) Color locking/hooking functionality.
+  - README updated. We have a documentation page over at
+  - (Improvement - Work in progress) Color scheme UI overhaul in progress
+    - Darken current color
+    - Lighten current color
+    - Select random color
+  - (Improvement - Work in progress) Add/Delete custom, named color schemes from theme configuration page. W/ AJAX
+  - (Improvement) - Schemes changed in theme configuration will now update images and values when submitted.
+  - (Improvement) Image overhaul
+    - Unlimited images
+    - Unlimited gradients
+    - Unlimited solid-color fills
+  - (Improvement) Stylesheet color replacement - We will now offer a Base-shift (garland-type) mode, a Custom mode for just tags, and a Hybrid which is a mix of the two. :) There is an option to automatically pick your mode.
+  - (Minor addition) In the Garland color.inc example, I added the "Majestic" scheme. Looks pretty nice.
+  - (Correcting ambiguity) In the blocks section, the block will be named 'Pick color scheme'.
+  - (Correcting ambiguity) 'Regenerate schemes' button. On the theme config, there will be a new button for this. Previously, you would have to click "Reset to defaults" -- which was confusing and also defaulted other settings.
+  - (Correcting ambiguity) table change
+    `color_picks` is now `color_users`
+  - (Correcting ambiguity) function color_store_theme() to color_add_theme()
+  - (Changed name, same function) color_set_scheme() is now color_set_user_scheme()
+    Function for setting user schemes selections (Table: `color_picks`)
+  - (New function) color_set_scheme()
+    Formerly, this was used for storing users' scheme selections. I am now changing this function to the setting of the schemes themselves (Table: `color_users`).
+
+July 23rd, 2008
+
+  Allow BASE only color change! YES
+    Notes: If only base color is listed in a scheme, only commas will be listed.
+  - Fixed: Fix scheme reset not showing schemes on next pageview
+  - Fixed errors for themes without fields 'base', 'text', 'link'
+  - Fixed errors for themes without $info['copy']
+  - Fixed errors for theme without $info['preview_image'] on preview.inc
+  - Updated README.txt
+
+  Color.js
+    - is being fixed up for the custom preview.inc setup. The preview.css will change ID's matching your fields inside a div#preview. :)
+    - Is being set up to work with instances where certain schemes in a 'base' colorable layout doesn't have the rest/some of the fields setup.
+    - I have worked on reattaching the selectbox behavior for webmasters who want to add/remove custom schemes. (Has been driving me crazy!)
+
+July 9, 2008
+  Performance tweaks!
+  - color_get_schemes(), color_get_theme_info(), color_compatible(), color_get_palette() all use static variables.
+  - removed the extra $themes = list_themes(); in _color_rewrite_styleshet()
+  - moved code around in color_form_alter() to only retrieve themes and include algorithms when needed. (~40-50ms performance fix)
+  - Only taking need columns (id, name, hex) from schemes in color_get_theme_info()
+  - fixed support for garland/minnelli screenshot on /user/{uid}/edit
+  - fixed admin/build/themes/settings/{theme} to correctly set theme name
+  - Cleanstate: fixed up cleanstate a bit.
+  - Fixed default variable_get('cache') variables to fit the "Disabled" mode in admin/settings/performance by default.
+  - Fixed notice with Undefined indexes by using isset()
+
+  Unfinished:
+  - Custom preview.inc option. Currently, if you provide a preview.inc in the theme's /color folder, the default will be overridden.
+
+  Bugs:
+  - Without user_access('select different theme')) and select color scheme users can pick schemes w/ block but not user profile.
+
+June 26, 2008
+  - Bug fixes here and there. I had a list but laptop was left to sleep without saving... Doing best to keep tabs.
+  - make some functions for the _submit user scheme pick updates
+  - Fixed cleanstate theme to replace colors correctly
+  - Cleanstate scheme now has new custom fields + colors!
+  - "Reset to defaults" will now delete schemes for themes in files. It will also delete relevant user color picks. However it may change with:
+  - Fixed system up for clearing scheme_id's that don't exist.
+  - Removed color_legacy function. People will be able to change w/ proper documentation.
+  - Fixed bug On scheme change from Garland->Minelli, scheme won't change/update
+  - Fixed bug on scheme change to cleanstate scheme shows as aquamarine but "Your scheme does not match with your theme!" shows and color_pick row WHERE uid={uid} won't delete..
+  - Fixed bug with {{base}} color not switching!
+  - Fixed bug with switching back to default site theme (scheme will not del)
+
+  TODO: don't pull misc/file info unless necessary (not on page load alone)
+  TODO: Use some static functions to reduce loading the same data twice.
+  TODO: On moving to default theme, scheme select will not reset, unless after reload.
+
+June 20, 2008
+  - admin/build/themes/settings/{theme} will now change default color scheme
+  - Fixed link color with CSS changing on Garland.
+  - Fixed color block would show up on non-color themes
+  - When cache is on, color.module will not change schemes for anonymous users.
+  - "Reset to defaults" on /admin/build/themes/settings/{theme} will now correctly reset color schemes for themes
+  - Updated cleanstate color.inc file
+
+June 19, 2008
+  SQL Tweaking/New DB Functions
+
+  - (Done) INNER/LEFT JOIN more!
+  - (Done) allow color_get_theme_info and work on grabbing specific fields instead of all columns
+  - (Done) change 'default_set' to 'default scheme'. TRY TO USE ID!
+  - (Done) in color_theme_select_submit() before hand use hidden field to include scheme_id
+  - (Todo) Store info on what themes are colorable in {color} table
+
+June 18, 2008
+  Bug fix/Tweaking release
+
+  - (Added) On uninstall, whipe old schemes from dir
+  - (Added) Do a preg_replace('~[^a-z0-9._]+~, '-', drupal_strtolower($string)); to normalize file paths
+  - (Fixed) On block administration page, the theme now changes.
+  - (Fixed) Users can now change schemes w/o 'select different theme' perm.
+  - (Fixed) Bug on garland/minnelli with invalid stylesheet recoloring
+  - (Tweaked) Suppress repeat warnings in certain parts of scripts.
+  - (Updated) Update minnelli color.inc to new version.
+
+  Caching
+    I do not see this module as being very cache-friendly. There will have to be some thinking when it comes to this.
+
+  - Block cache: lags on select boxes on anonymous/registered users
+  - Caching modes 'normal': interrupts scheme changing for anonymous users. works OK w/ logged in ones
+
+June 16, 2008
+  New color replacement methods!
+
+  Changes:
+    - Find and replace fields from color.inc inside stylesheets. /* {{base}} */ #ffffff /* {{/base}} */
+    - Include a 'base' field if you want to change colors of non-tagged color values. (I.e. Garland)
+    - You can keep the above stylesheets in the /color folder by doing: 'css' => array( 'color/style.css',),
+    - Fixed bug w/ blend target storing in DB
+    - Added some more logic for falling back to default themes/color theme changing
+
+  Quirks:
+    - In listthemes(), must check if theme is enabled in system! This shows extra color-enabled themes in user/{uid}/edit
+    - When changing over a theme, the old scheme name may show in selectbox (the module will still correctly move to default scheme for newly selected theme, though)
+
+June 11, 2008
+  We got a color scheme block + anonymous color scheme selection + perms.
+
+  Changes:
+  - Fixed up webmaster theme selection
+  - Users other the uid 1 can choose scheme.
+  - Color scheme changing block. (YES.)
+  - Anonymous users can now pick color schemes
+  - Started applying user permissions to scheme selection. If user is not granted permission they will not be able to see scheme selection and default to default_set scheme for the theme.
+
+  Need to know: You have to set the 'choose color scheme' permissions for the user type if they want to see the block/change schemes.
+
+June 9, 2008
+  Changes:
+
+  - Legacy support code is now in the color_get_theme_info() function.
+  - Updated color.image.inc for some legacy support for gradients without the color field values. (supposed to be listed like x, y, width, height, color1, color2)
+  - Modularized code into color.database.inc, color.stylesheet.inc and color.misc.inc
+  - Now 3 tables: 'color' for theme info, 'color_schemes' for individual name/theme/hex info, and 'color_picks' for user scheme choices.
+  - In color.database.inc, there is now functions to find scheme based on UID, hex, and scheme/theme
+  - color_legacy($info) in color.misc.inc function for checking/changing old scheme .inc files to be compatible with this.
+
+  Known quirks:
+  - Minnelli is having very odd color effects. (http://img338.imageshack.us/img338/8634/picture8no4.png) (With current color.scheme using legacy support code to fix).
+
+
+June 8, 2008
+  Users can now pick color schemes
+
+  Changes:
+    + Color schemes are now in 'color_schemes' table
+    + Instead of every theme having one scheme stored, all schemes are stored for user selection.
+    + Scheme file information stored in 'extra_attr' column
+    + In preparation for user custom schemes, the 'scheme' column will attempt to match with the 'name' column of a pre-made theme. If no match, in the future will assume it is a custom user theme. (Generate graphics/stylesheet)
+    + Users can now pick color schemes for themes on a user basis via user/{uid}/edit. (YES)
+
+  Known Quirks:
+   - Color schemes are installed when color.module is installed.
+   - New individual color themes are added when you go to admin/build/themes/settings/{theme}
+   - When schemes are first installed, esp. after the module installation w/ a few color themes, the set messages list is very long. Need to find a way to quiet that.
+
+
+June 1, 2008
+  We are on our way to allowing users to select their color schemes.
+
+  Changes:
+    - For the moment the inline color scheme selection has been removed from /user/{uid}/edit. Can be placed back at a later time if wanted (it is in 1.6 of color.module)
+    - Fixed bug with color schemer showing on none Color.module themes.
+    - (Second commit today) Fixed bug where color schemes would change across themes. Every chosen theme w/ a scheme should have it's own row.
+    + Users can now store their theme selections (not creations yet) in the DB. It will insert and edit.
+    + New special 'user_scheme' name. Currently stores serialized hexed codes for color schemes. Built to support custom schemes for users.
+    + A form submit checking for when a theme and color scheme is chosen at the same time.
+    + (Second commit today): Used coder.module to brush up a bit.
+
+May 30, 2008
+  This is a commit so my mentors (Konstantin and Dmitri) and anyone else who wants to can see what I've been working on. There is a lot of temporary code in this commit.
+
+  Changes:
+  + Inline color scheme select
+  + Fixed schemer to work with more themes!
+  + Schemer now has some (maybe temporary) support for legacy color.inc files. It will present a warning but still adds to the database all the same.
+  + Split functions up into color.image.inc and color.algorithms.inc
+  - Removed primary key for indexes atm. For now to change this please Uninstall/Reinstall module. It will suppress some duplicate errors from before.
+
+  Known Quirks: I cannot get the values of the select boxes for color schemes on color-enabled themes to all submit seperately on /user/{uid}/edit. It seems as if the last select box overwrites all the previous ones. And the ['colorselectbox'] hex shows up all around the form output with dprint_r($form);
+
+May 28, 2008
+  Changes:
+  + Added the "uid" column. Index in scheme for 'theme', 'uid' for the moment.
+  + Added "Color-enabled" in description of themes with color support (color.inc files present)
+  + Added
+
+  Known quirks:
+  - I just found that current color.module in Drupal 6 may not be handling screenshot preview correctly.
+
+
+May 26, 2008
+  Changes:
+  + Support for unlimited/custom amount of color fields. Fields atm must be declared in color.inc.
+  + Color scheme keys changed to scheme name (was value/hexes). Implemented storage of schemes/other color theme variables in SQL.
+  + Color.module install schema.
+  + "Reset to defaults" can be used to reset the SQL (incase you wanted to try adding new fields/colors).
+  + Gradient colors can now be chosen through field names of your choice.
+
+  Known Quirks:
+  - (Fixed) Blank page on module enable/disable, theme change submit/reset. Try reloading the URL w/o form POST.

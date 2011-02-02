@@ -1,0 +1,1002 @@
+<?php
+// $Id: color.module,v 1.18.2.39 2009/05/14 12:40:17 skiquel Exp $
+
+/**
+ * @file
+ * Allows webmasters and themers to create color-customizeable themes.
+ * Opens up color API calls
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function color_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#color':
+      $output = '<p>'. t('The color module allows a site administrator to quickly and easily change the color scheme of certain themes. Although not all themes support color module, both Garland (the default theme) and Minnelli were designed to take advantage of its features. By using color module with a compatible theme, you can easily change the color of links, backgrounds, text, and other theme elements. Color module requires that your <a href="@url">file download method</a> be set to public.', array('@url' => url('admin/settings/file-system'))) .'</p>';
+      $output .= '<p>'. t("It is important to remember that color module saves a modified copy of the theme's specified stylesheets in the files directory. This means that if you make any manual changes to your theme's stylesheet, you must save your color settings again, even if they haven't changed. This causes the color module generated version of the stylesheets in the files directory to be recreated using the new version of the original file.") .'</p>';
+      $output .= '<p>'. t('To change the color settings for a compatible theme, select the "configure" link for the theme on the <a href="@themes">themes administration page</a>.', array('@themes' => url('admin/build/themes'))) .'</p>';
+      $output .= '<p>'. t('For more information, see the online handbook entry for <a href="@color">Color module</a>.', array('@color' => 'http://drupal.org/handbook/modules/color/')) .'</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function color_theme() {
+  return array(
+    'color_scheme_form' => array(
+      'arguments' => array('form' => NULL),
+    ),
+    'color_edit_scheme_form' => array(
+      'arguments' => array('form' => NULL),
+    ),
+    'color_settings_colorable' => array(
+      'arguments' => array('form' => NULL),
+    ),
+    'color_settings_extensions' => array(
+      'arguments' => array('extensions' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_menu()
+ */
+function color_menu() {
+  module_load_include('inc', 'color', 'color.database');
+
+  $items['color/js'] = array(
+    'page callback' => 'color_js',
+    'access arguments' => array('select different color scheme'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['color/installer'] = array(
+    'page callback' => 'color_installer',
+    'access arguments' => array('select different color scheme'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/settings/schemes'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('color_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'title' => t('Color schemes settings'),
+    'description' =>  t('Configure color schemes settings'),
+  );
+  $items['admin/settings/schemes/extensions'] = array(
+    'page callback' => 'color_settings_extensions',
+    'access arguments' => array('administer site configuration'),
+    'title' => t('Extensions'),
+    'description' =>  t('Add-ons for color.module'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  // We may want to keep this as a dev feature.
+  $items['admin/settings/schemes/colorable'] = array(
+    'page callback' => 'color_settings_extensions',
+    'access arguments' => array('administer site configuration'),
+    'title' => t('Colorable'),
+    'description' =>  t('Colorable theme elements, themes, modules, and stylesheets.'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/settings/schemes/list'] = array(
+    'title' => t('Settings'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  foreach (color_list_themes() as $theme) {
+    $items['admin/build/themes/settings/'. $theme->name .'/%'] = array(
+      'page callback' => 'color_op',
+      'page arguments' => array(4, 5),
+      'title callback' => 'color_get_title',
+      'title arguments' => array(5),
+      'type' => MENU_LOCAL_TASK,
+      'access arguments' => array('access administration pages'),
+    );
+  }
+  return $items;
+}
+
+/**
+ * Callback for the theme to alter the resources used.
+ */
+function color_preprocess_page(&$vars) {
+  global $theme_key;
+  module_load_include('inc', 'color', 'color.algorithms');
+
+  // See if theme is color-enabled
+  if (variable_get('theme_color_'. $theme_key, 0) == 0) {
+    return;
+  }
+  
+  global $language, $user, $custom_theme, $custom_scheme, $preview_scheme;
+  $uid = $user->uid;
+
+  $scheme = array();
+  $theme = array();
+
+  // Get the correct theme
+  if (isset($theme_key)) {
+    $theme['name'] = $theme_key;
+  }
+  elseif (isset($custom_theme)) {
+    $theme['name'] = $custom_theme;
+  }
+  else {
+    $theme['name'] = empty($vars['user']->theme) ? variable_get('theme_default', 'garland') : $vars['user']->theme;
+  }
+
+  // Get the correct scheme ID
+  if ($uid == 0 && $_SESSION['scheme_id'] && module_exists('color_user')) {
+    $scheme['id'] = $_SESSION['scheme_id'];
+  }
+  elseif (isset($custom_scheme)) {
+    $scheme['id'] = $custom_scheme;
+  }
+  elseif ($uid != 0 && module_exists('color_user')) {
+    module_load_include('module', 'color', 'color_user');
+    $scheme['id'] = color_user_get_scheme_id($uid);
+    if ($scheme['id'] == 0) {
+      $scheme['id'] = db_result(db_query("SELECT `default scheme` FROM {color} WHERE name = '%s'", $theme['name']));
+    }
+    else {
+      if (isset($_SESSION['scheme_id'])) {
+        unset($_SESSION['scheme_id']);
+      }
+    }
+  }
+
+  // Include our database so we can check if data is valid and pull.
+  module_load_include('inc', 'color', 'color.database');
+
+  if (!color_scheme_id_valid($scheme['id'], $theme['name'])) {
+    $scheme['id'] = db_result(db_query("SELECT `default scheme` FROM {color} WHERE name = '%s'", $theme['name']));
+  }
+
+  if (isset($preview_scheme)) {
+    color_get_preview($theme, $scheme);
+  }
+  else {
+    color_get_scheme($scheme);
+  }
+  $color_paths = $scheme['stylesheets'];
+  if ($scheme['logo']) {
+    $logo = $scheme['logo'];
+  }
+  // Override stylesheets.
+  if (!empty($color_paths)) {
+    // Loop over theme CSS files and try to Rebuild CSS array with rewritten
+    // stylesheets. Keep the orginal order intact for CSS cascading.
+    $new_theme_css = array();
+
+    foreach ($vars['css']['all']['theme'] as $old_path => $old_preprocess) {
+      // Add the non-colored stylesheet first as we might not find a
+      // re-colored stylesheet for replacement later.
+      $new_theme_css[$old_path] = $old_preprocess;
+
+      // Loop over the path array with recolored CSS files to find matching
+      // paths which could replace the non-recolored paths.
+      foreach ($color_paths as $color_path) {
+        // Color module currently requires unique file names to be used,
+        // which allows us to compare different file paths.
+        if (basename($old_path) == basename($color_path)) {
+          // Pull out the non-colored and add rewritten stylesheet.
+          unset($new_theme_css[$old_path]);
+          $new_theme_css[$color_path] = $old_preprocess;
+
+          // If the current language is RTL and the CSS file had an RTL variant,
+          // pull out the non-colored and add rewritten RTL stylesheet.
+          if (defined('LANGUAGE_RTL') && $language->direction == LANGUAGE_RTL) {
+            $rtl_old_path = str_replace('.css', '-rtl.css', $old_path);
+            $rtl_color_path = str_replace('.css', '-rtl.css', $color_path);
+            if (file_exists($rtl_color_path)) {
+              unset($new_theme_css[$rtl_old_path]);
+              $new_theme_css[$rtl_color_path] = $old_preprocess;
+            }
+          }
+          break;
+        }
+      }
+    }
+    $vars['css']['all']['theme'] = $new_theme_css;
+    $vars['styles'] = drupal_get_css($vars['css']);
+  }
+
+  // Override logo.
+  if ($logo && $vars['logo'] && preg_match('!'. $theme_key .'/logo.png$!', $vars['logo'])) {
+    if (file_exists($_SERVER["DOCUMENT_ROOT"] . base_path() . $logo)) {
+      $vars['logo'] = base_path() . $logo;
+    }
+  }
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function color_form_alter(&$form, $form_state, $form_id) {
+  global $base_url;
+  module_load_include('inc', 'color', 'color.misc');
+  module_load_include('inc', 'color', 'color.database');
+
+  // Insert the color changer into the theme settings page.
+  if ($form_id == 'system_theme_settings' && arg(4) && color_compatible(arg(4)) && function_exists('gd_info')) {
+    module_load_include('inc', 'color', 'color.database');
+
+    if (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) != FILE_DOWNLOADS_PUBLIC) {
+      // Disables the color changer when the private download method is used.
+      // TODO: This should be solved in a different way. See issue #181003.
+      drupal_set_message(t('The color picker only works if the <a href="@url">download method</a> is set to public.', array('@url' => url('admin/settings/file-system'))), 'warning');
+    }
+    else {
+      $form['color'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Color schemes'),
+        '#description' => t('Customize the colors of your website.'),
+        '#weight' => -1,
+        '#attributes' => array('id' => 'color_scheme_form'),
+        '#theme' => 'color_scheme_form',
+      );
+      $form['color'] += color_scheme_form($form_state, arg(4));
+      $form['#submit'][] = 'color_scheme_form_submit';
+    }
+  }
+
+  // For admin/build/themes
+  if ($form_id == 'system_themes_form') {
+    $themes = color_list_themes(TRUE, NULL, TRUE);
+    foreach ($themes as $theme) {
+      $screenshot = variable_get('theme_'. $theme->name .'_screenshot', NULL);
+      if (!empty($form[$theme->name]['info']['#value']['name'])) {
+        $form[$theme->name]['info']['#value']['name'] .= ' <span class="pngfix"><img src="' . $base_url . '/' . drupal_get_path('module', 'color') . '/images/color-icon.png" title="' . t("This theme supports color customization.") . '" alt="' . t("Color configurable") . '"></span>';
+      }
+      if (($screenshot = variable_get('theme_'. $theme->name .'_screenshot', NULL)) && isset($form[$theme->name]['screenshot'])) {
+        $form[$theme->name]['screenshot']['#value'] = theme('image', $screenshot, '', '', array('class' => 'screenshot'), FALSE);
+      }
+    }
+  }
+
+}
+
+/**
+ * Form callback. Returns the configuration form.
+ */
+function color_scheme_form(&$form_state, $theme) {
+  module_load_include('inc', 'color', 'color.misc');
+  module_load_include('inc', 'color', 'color.database');
+
+  $form = array(
+    '#prefix' => '<div id="color-scheme-wrapper">',
+    '#suffix' => '</div>',
+  );
+
+  if (variable_get('theme_color_'. $theme, 0) == 0) {
+    if (variable_get('theme_color_'. $theme .'_generated', 0) == 0) {
+      $form['generate'] = array(
+        '#type' => 'item',
+        '#value' => l('Generate schemes and enable', 'admin/build/themes/settings/' . $theme . '/enable_color_build') . '.',
+        '#tree' => FALSE,
+      );
+    }
+    else {
+      $toggle = "Color service is disabled. " . l('Enable', 'admin/build/themes/settings/' . $theme . '/enable_color') . '.';
+      $form['toggle_color'] = array(
+        '#type' => 'item',
+        '#value' => $toggle,
+        '#tree' => FALSE,
+      );
+      $form['purge'] = array(
+        '#type' => 'item',
+        '#value' => "You still have leftover schemes. " . l('Free up space', 'admin/build/themes/settings/' . $theme . '/purge') . '.',
+        '#tree' => FALSE,
+      );
+    }
+  }
+
+  if (variable_get('theme_color_' . $theme, 0) == 1 && variable_get('theme_color_' . $theme . '_generated', 0) == 1) {
+    color_get_theme($theme);
+    color_get_theme_extras($theme);
+
+    // See if we're using a predefined scheme
+    $current = $theme['default scheme'];
+
+    $form['scheme_list'] = array(
+      '#type' => 'select',
+      '#options' => array_flip($theme['schemes']['id']),
+      '#default_value' => $current,
+    );
+
+    $form['default'] = array(
+      '#type' => 'submit',
+      '#value' => t('Make default'),
+    );
+
+    $form['modify'] = array(
+      '#type' => 'submit',
+      '#value' => t('Modify'),
+    );
+
+    $form['create_scheme'] = array(
+      '#type' => 'submit',
+      '#value' => t('Create scheme'),
+    );
+
+    $form['scheme_settings'] = array(
+      '#type' => 'fieldset',
+      '#tree' => TRUE,
+      '#title' => 'Scheme options (' . l('settings', 'admin/settings/schemes') . ')',
+      '#prefix' => '<div id="scheme-settings-wrapper">',
+      '#suffix' => '</div>',
+    );
+
+    $form['scheme_settings']['toggle_color'] = array(
+      '#type' => 'item',
+      '#value' => t("Color service for this theme is <strong>on</strong>. ". l('Disable', 'admin/build/themes/settings/' . $theme['name'] . '/disable_color') . '.'),
+      '#tree' => FALSE,
+    );
+
+    $color = color_get_color_hook($theme['name']);
+
+    if (variable_get('color_hook_preview', 0) == 1) {
+
+      $form['color-hook-scheme-wrapper'] = array(
+        '#type' => 'fieldset',
+        '#prefix' => '<div id="color-inc-wrapper">',
+        '#suffix' => '</div>',
+        '#weight' => -5,
+        '#title' => t('hook_color() preview (for theme developers)'),
+        '#description' => t("Allows demo users to see the theme's hook_color()."),
+      );
+
+      $form['color-hook-scheme-wrapper']['textfield'] = array(
+        '#type' => 'textarea',
+        '#default_value' => $color,
+      );
+    }
+
+    $form['theme'] = array('#type' => 'value', '#value' => serialize($theme));
+  }
+  return $form;
+}
+
+/**
+ * Theme color form.
+ *
+ * @ingroup @themeable
+ */
+function theme_color_scheme_form($form) {
+  $base = drupal_get_path('module', 'color');
+  drupal_add_css($base .'/color.css', 'module', 'all', TRUE);
+}
+
+/**
+ * Submit handler for color change form.
+ */
+function color_scheme_form_submit($form, &$form_state) {
+  if (!isset($form_state['values']['theme'])) {
+    return;
+  }
+  module_load_include('inc', 'color', 'color.database');
+  $theme = unserialize($form_state['values']['theme']);
+  $palette = $form_state['values']['palette'];
+  $scheme_id = $form_state['clicked_button']['#post']['scheme_list'];
+
+  if ($form_state['clicked_button']['#id'] == "edit-modify") {
+    drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/' . $scheme_id);
+    return;
+  }
+  elseif ($form_state['clicked_button']['#id'] == "edit-default") {
+    db_query("UPDATE {color} SET `default scheme` = '%s' WHERE id = '%s'", $scheme_id, $theme['id']);
+  }
+  elseif ($form_state['clicked_button']['#id'] == "edit-create-scheme") {
+    drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/create_scheme/' . $scheme_id);
+  }
+
+}
+
+/**
+ * Form for the scheme editor
+ */
+function color_edit_scheme_form() {
+  global $user, $custom_theme, $custom_scheme, $preview_scheme;
+
+  module_load_include('inc', 'color', 'color.misc');
+
+  $theme = arg(4);
+  $scheme_id = arg(5);
+
+  module_load_include('inc', 'color', 'color.database');
+
+  $custom_scheme = $scheme_id;
+  $custom_theme = $theme;
+
+  $scheme['id'] = $scheme_id;
+  if (arg(6) == "preview") {
+    $preview_scheme = TRUE;
+  }
+
+  $base = drupal_get_path('module', 'color');
+  color_get_theme($theme);
+
+  // Add Farbtastic color picker
+  drupal_add_css('misc/farbtastic/farbtastic.css', 'module', 'all', FALSE);
+  drupal_add_js($base .'/farbtastic.js');
+  
+  // Add custom CSS/JS
+  drupal_add_css($base .'/color-edit.css', 'module', 'all', FALSE);
+  drupal_add_js($base .'/color.js');
+
+  init_theme();
+
+  $reference = color_array_combine($theme['fields'], $theme['reference scheme']['hex']);
+  $scheme['id'] = $scheme_id;
+  if (arg(6) == "preview") {
+    color_get_preview($theme, $scheme);
+    $palette = $scheme['hex'];
+    $palette = color_array_combine($theme['fields'], $palette);
+    $scheme_name = $scheme['name'];
+    $status = $scheme['status'];
+
+  }
+  elseif ($scheme_id == "create_scheme" && $scheme = $theme['default scheme']) {
+    $palette = $scheme['hex'];
+    $palette = color_array_combine($theme['fields'], $palette);
+    $scheme_name = "Scheme name";
+    $scheme['name'] = $scheme_name;
+  }
+  else if ($scheme = color_get_scheme($scheme_id, TRUE)) {
+    $palette = $scheme['hex'];
+    $palette = color_array_combine($theme['fields'], $palette);
+    // status of 0 is pre-made, status of 1 is admin-made
+    $status = $scheme['status'];
+    $scheme_name = $scheme['name'];
+  }
+
+  // For future reference! By changing this option, we change the way the 'lock' functionality works
+  // 'reference' => $palette will retain hue, modifying saturation and lightness (SL)
+  // 'reference' => $reference will switch all to the same hue, apparently only affecting lightness.
+  drupal_add_js(array('color' => array(
+    'reference' => $palette,
+  )), 'setting');
+
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l(ucfirst($theme['name']), 'admin/build/themes/settings/' . $theme['name']);
+  if ($scheme_name == "Scheme name") { // if new scheme form showing
+    $breadcrumb[] = "New scheme";
+  }
+  else {
+    $breadcrumb[] = $scheme_name . " (Scheme)";
+  }
+  drupal_set_breadcrumb($breadcrumb);
+
+  $current = $theme['default scheme']['id'];
+
+  $form = array(
+    '#weight' => -1,
+    '#prefix' => '<div id="color-scheme-wrapper">',
+    '#suffix' => '</div>',
+    '#tree' => TRUE,
+    '#theme' => 'color_edit_scheme_form',
+  );
+
+  $alter_links = "<a href=\"#\" id=\"darken\">darken</a> | <a href=\"#\" id=\"lighten\">lighten</a> | <a href=\"#\" id=\"randomize\">randomize</a>";
+
+  $path = drupal_get_path('theme', $theme['name']) .'/';
+
+  $form['scheme_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Scheme'),
+    '#default_value' => $scheme_name,
+    '#size' => 12
+  );
+  $form['alter_input'] = array(
+    '#value' => $alter_links,
+    '#type' => "item",
+  );
+
+  if (variable_get('color_hook_scheme_snippet', 0) == 1) {
+    $form['color_scheme_output'] = array(
+      '#title' => 'hook_color() snippet (Theme developers)',
+      '#type' => 'textfield',
+      '#value' => "'" . $scheme_name. "' => '" . implode(',', array_values($palette)) . "',",
+    );
+  }
+
+  $form['options'] = array(
+    '#tree' => TRUE,
+    '#prefix' => '<div id="options-scheme-wrapper">',
+    '#suffix' => '</div>',
+  );
+
+  $form['options']['save'] = array(
+    '#tree' => TRUE,
+    '#prefix' => '<div id="save-scheme-wrapper">',
+    '#suffix' => '</div>',
+  );
+
+  $form['options']['save']['button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+
+  $form['options']['preview'] = array(
+    '#tree' => TRUE,
+    '#prefix' => '<div id="preview-scheme-wrapper">',
+    '#suffix' => '</div>',
+  );
+
+  $form['options']['preview']['button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Preview'),
+  );
+
+  if (arg(6) == "preview") {
+    $form['options']['cancel'] = array(
+      '#tree' => TRUE,
+      '#prefix' => '<div id="cancel-scheme-wrapper">',
+      '#suffix' => '</div>',
+    );
+
+    $form['options']['cancel']['button'] = array(
+      '#type' => 'submit',
+      '#value' => t('Cancel'),
+    );
+  }
+
+  if (isset($status) && $status == 0 && variable_get('color_modify_premade_schemes', 0) == 0) {
+    $form['options']['save']['button']['#disabled'] = TRUE;
+    $form['notice'] = array(
+      '#type' => 'item',
+      '#value' => t('Modifying pre-made schemes turned off. To turn on, go to !settings.', array('!settings' => l('scheme settings', 'admin/settings/schemes'))),
+    );
+  }
+  if ($current != $scheme['id'] && $scheme_id != "create_scheme") {
+    $form['options']['default'] = array(
+      '#tree' => TRUE,
+      '#prefix' => '<div id="default-scheme-wrapper">',
+      '#suffix' => '</div>',
+    );
+
+    $form['options']['default']['button'] = array(
+      '#type' => 'submit',
+      '#value' => t('Make default'),
+    );
+
+    $form['options']['delete'] = array(
+      '#tree' => TRUE,
+      '#prefix' => '<div id="delete-scheme-wrapper">',
+      '#suffix' => '</div>',
+    );
+    $form['options']['delete']['button'] = array(
+      '#type' => 'submit',
+      '#value' => t('Delete'),
+    );
+  }
+
+  $form['back'] = array(
+    '#type' => 'item',
+    '#value' => l('Back to theme configuration', 'admin/build/themes/settings/' . $theme['name']) . '.',
+  );
+
+  // Find colors
+  $names = array();
+  foreach ($palette as $name => $hex) {
+    $names[$name] = $name;
+    $palette[$name] = $hex;
+  }
+
+  $form['palette'] = array(
+    '#prefix' => '<div id="palette">',
+    '#suffix' => '</div>',
+    '#tree' => TRUE,
+  );
+  foreach ($palette as $name => $value) {
+    if (!$value) {
+      drupal_set_message("The colors set in the scheme in the hook_color doesn't correspond with the number of fields.", 'status', FALSE);
+    }
+    $form['palette'][$name] = array(
+      '#type' => 'textfield',
+      '#title' => $names[$name],
+      '#default_value' => $value,
+      '#size' => 12,
+      '#maxlength' => 7,
+      '#attributes' => array('class' => 'hex'),
+    );
+  }
+
+  if (isset($status)) {
+    $form['status'] = array('#type' => 'hidden', '#value' => $status);
+  }
+  $form['scheme_data'] = array('#type' => 'hidden', '#value' => serialize($scheme));
+  $form['scheme_id'] = array('#type' => 'hidden', '#value' => arg(5));
+  $form['theme_data'] = array('#type' => 'hidden', '#value' => serialize($theme));
+
+  return $form;
+}
+
+/**
+ * Theme for the color editor form.
+ *
+ * @ingroup @themeable
+ */
+ function theme_color_edit_scheme_form($form) {
+
+  // Include stylesheet
+  $theme = unserialize($form['theme_data']['#value']);
+  $path = drupal_get_path('theme', $theme['name']) .'/';
+  drupal_add_css($path . $info['preview']['css']);
+  $output = '';
+
+  $output .= '<div class="color-form clear-block">';
+
+  $output .= '<div id="edit-left-sidebar-wrapper">';
+  $output .= drupal_render($form['scheme_name']);
+  $output .= drupal_render($form['palette']);
+  $output .= drupal_render($form['alter_input']);
+  $output .= '</div>';
+
+  $output .= '
+  <div style="clear: both">
+    <div style="width: 250px; float: left">
+      <fieldset> <legend>Compatible colors</legend>
+        <select id="selectsuggestedcolors">
+          <option value="analogous">Analogous</option>
+          <option value="complementary">Complementary</option>
+          <option value="triadic">Triadic</option>
+          <option value="tetradic">Tetradic</option>
+          <option value="neutral">Neutral</option>
+          <option value="split-complementary">Split-complementary</option>
+          <option value="clash">Clash</option>
+          <option value="four-tone">Four-tone</option>
+          <option value="five-tone">Five-tone</option>
+          <option value="six-tone">Six-tone</option>
+        </select>
+        <div id="suggestedcolors"></div>
+        <div class="description" style="font-size: 75%">Whip out some <a href="http://www.colormatters.com/colortheory.html">color theory</a> kung-fu.</div>
+      </fieldset>
+    </div>
+
+    <div style="width: 250px; float: left">
+      <fieldset>
+        <legend>Color History</legend>
+        <div id="prevcolors"></div>
+        <div class="description" style="font-size: 75%">Tip: You can also select an input field and hold down Ctrl-Z or Command-Z to undo. Likewise for redo.</div>
+      </fieldset>
+    </div>
+  </div>
+  <div style="clear: both"></div>';
+  $output .= drupal_render($form['preview']);
+  $output .= drupal_render($form['options']);
+
+  $output .= '</div>';
+
+  $output .= drupal_render($form);
+
+  return $output;
+}
+
+/**
+ * The submit function for the color scheme editor.
+ */
+function color_edit_scheme_form_submit($form, &$form_state) {
+  if (!isset($form['#post']['theme_data']) || !isset($form['#post']['op'])) {
+    return;
+  }
+
+  $theme = unserialize($form['#post']['theme_data']);
+  $scheme = unserialize($form_state['values']['scheme_data']);
+  $scheme['id'] = $form_state['values']['scheme_id'];
+  $scheme['name'] = $form_state['values']['scheme_name'];
+  $scheme['status'] = isset($form_state['values']['status']) ? $form_state['values']['status'] : NULL;
+  $scheme['theme'] = $theme['id'];
+  $palette = $form_state['values']['palette'];
+
+  if ($form_state['clicked_button']['#id'] == "edit-options-default-button") {
+    db_query("UPDATE {color} SET `default scheme` = '%s' WHERE id = '%s'", $scheme['id'], $theme['id']);
+  }
+  elseif ($form_state['clicked_button']['#id'] == "edit-options-delete-button") {
+    color_set_scheme($scheme, $theme, 'delete');
+    drupal_goto('admin/build/themes/settings/' . $theme['name']);
+    return;
+  }
+  else {
+    // Resolve palette
+    if (empty($hex)) {
+      foreach ($palette as $k => $color) {
+        $hex[] = $color;
+      }
+    }
+    
+    $hex = array_combine($theme['fields'], $palette);
+
+    $scheme['hex'] = $hex;
+
+    if ($form_state['clicked_button']['#id'] == "edit-options-save-button") {
+      // Make sure enough memory is available, if PHP's memory limit is compiled in.
+      if (function_exists('memory_get_usage') && isset($theme['image'])) {
+        // Fetch source image dimensions.
+        foreach ($theme['image'] as $img) {
+          $source = drupal_get_path('theme', $theme['name']) .'/'. $img['file'];
+          list($width, $height) = getimagesize($source);
+
+          // We need at least a copy of the source and a target buffer of the same
+          // size (both at 32bpp).
+          $required = $width * $height * 8;
+          $usage = memory_get_usage();
+          $limit = parse_size(ini_get('memory_limit'));
+          if ($usage + $required > $limit) {
+            drupal_set_message(t('There is not enough memory available to PHP to change this theme\'s color scheme. You need at least %size more. Check the <a href="@url">PHP documentation</a> for more information.', array('%size' => format_size($usage + $required - $limit), '@url' => 'http://www.php.net/manual/en/ini.core.php#ini.sect.resource-limits')), 'error', FALSE);
+            return;
+          }
+        }
+      }
+
+      if ($scheme['id'] == "create_scheme") { // admin/build/themes/settings/{theme}/create_scheme (new scheme)
+        $scheme['status'] = 1;
+        $scheme['id'] = color_set_scheme($scheme, $theme, 'create');
+        drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/' . $scheme['id']);
+      }
+      else {  // admin/build/themes/settings/{theme}/{scheme_id} (edit themes)
+        $scheme['status'] = 1;
+        color_set_scheme($scheme, $theme, 'update');
+        drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/' . $scheme['id']);
+      }
+    }
+    elseif ($form_state['clicked_button']['#id'] == "edit-options-preview-button") {
+      color_set_preview($scheme, $theme);
+      drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/' . $scheme['id'] . '/preview');
+    }
+    elseif ($form_state['clicked_button']['#id'] == "edit-options-cancel-button") {
+      drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/' . $scheme['id']);
+    }
+  }
+}
+
+/**
+ * Retreive name of scheme
+ *
+ * @param $id
+ *   Integer of scheme id
+ * @return
+ *   String of scheme name
+ */
+function color_get_title($id) {
+  module_load_include('inc', 'color', 'color.database');
+
+  $scheme['id'] = $id;
+  color_get_scheme($scheme);
+
+  return $scheme['name'];
+}
+
+/**
+ * Operation page, used at admin/build/themes/{themes}/{op}
+ * Will redirect user to scheme ID if valid, or to other actions
+ *
+ * @param $theme_name
+ *  String of theme name
+ * @param $action
+ *  String or integer of action to perform
+ * @param $subaction
+ *  A string that sub-parameters for actions. For instance, "preview" for
+ *  the color scheme editor.
+ */
+function color_op($theme_name, $action, $subaction = NULL) {
+  global $user;
+
+  $theme['name'] = $theme_name;
+
+  module_load_include('inc', 'color', 'color.database');
+  if (is_numeric($action) && color_scheme_id_valid($action, $theme['name'])) {
+    $preview = (isset($subaction) && $subaction == "preview") ? TRUE : FALSE;
+    $page = drupal_get_form('color_edit_scheme_form');
+    return $page;
+  }
+  else {
+    if ($action == "enable_color") {
+      if (variable_get('theme_color_' . $theme['name'] . '_generated', 0) == 0) {
+        drupal_set_message("Cannot enable until themes generated.", "error", FALSE);
+      }
+      else {
+        variable_set('theme_color_'. $theme['name'], 1);
+      }
+    }
+    elseif ($action == "create_scheme") {
+      $page = drupal_get_form('color_edit_scheme_form', $theme, $action);
+      return $page;
+    }
+    elseif ($action == "enable_color_build") {
+      module_load_include('inc', 'color', 'color.batch');
+      color_batch_generate($theme['name']);
+    }
+    elseif ($action == "disable_color") {
+      variable_set('theme_color_'. $theme['name'], 0);
+    }
+    elseif ($action == "purge") {
+      color_scheme_reset($theme['name']);
+    }
+    else {
+      drupal_set_message("Scheme does not exist.", "error", FALSE);
+    }
+
+    drupal_goto('admin/build/themes/settings/' . $theme['name']);
+    return;
+  }
+}
+
+/**
+ * Grab the scheme ID for a User ID
+ */
+function color_settings_form() {
+  $form['webmaster'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Webmaster',
+  );
+
+  $form['webmaster']['color_modify_premade_schemes'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Modification of default schemes',
+    '#description' => 'Allow for administrators to modify default schemes.',
+    '#default_value' => variable_get('color_modify_premade_schemes', 0),
+  );
+
+  $form['theme_developers'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Theme Developers',
+  );
+
+  $form['theme_developers']['color_hook_scheme_snippet'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Scheme snippets',
+    '#description' => 'Show a snippet of code for schemes when editing.',
+    '#default_value' => variable_get('color_hook_scheme_snippet', 0),
+
+  );
+
+  $form['theme_developers']['color_hook_validator'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Validate hook_color() markup',
+    '#description' => 'Allow developers to validate hook_color() markup for consistency (not working yet)',
+    '#default_value' => variable_get('color_hook_validator', 0),
+  );
+
+  $form['demonstration'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Demonstration',
+    '#description' => 'Features designed for demonstrating color schemes.'
+  );
+
+  $form['demonstration']['color_hook_preview'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'hook_color() preview',
+    '#description' => "Show a textarea of the scheme's hook_color(). (may not be working)",
+    '#default_value' => variable_get('color_hook_preview', 0),
+  );
+
+  return system_settings_form($form);
+}
+
+function color_settings_colorable() {
+
+  return theme('color_settings_colorable', $requirements);
+
+}
+
+/**
+ * Theme requirements status report.
+ *
+ * @param $requirements
+ *   An array of requirements.
+ * @ingroup themeable
+ */
+function theme_color_settings_colorable(&$requirements) {
+  $i = 0;
+  $output = '<table class="system-status-report">';
+  foreach ($requirements as $requirement) {
+    if (empty($requirement['#type'])) {
+      $class = ++$i % 2 == 0 ? 'even' : 'odd';
+
+      $classes = array(
+        REQUIREMENT_INFO => 'info',
+        REQUIREMENT_OK => 'ok',
+        REQUIREMENT_WARNING => 'warning',
+        REQUIREMENT_ERROR => 'error',
+      );
+      $class = $classes[isset($requirement['severity']) ? (int)$requirement['severity'] : 0] .' '. $class;
+
+      // Output table row(s)
+      if (!empty($requirement['description'])) {
+        $output .= '<tr class="'. $class .' merge-down"><th>'. $requirement['title'] .'</th><td>'. $requirement['value'] .'</td></tr>';
+        $output .= '<tr class="'. $class .' merge-up"><td colspan="2">'. $requirement['description'] .'</td></tr>';
+      }
+      else {
+        $output .= '<tr class="'. $class .'"><th>'. $requirement['title'] .'</th><td>'. $requirement['value'] .'</td></tr>';
+      }
+    }
+  }
+
+  $output .= '</table>';
+  return $output;
+}
+
+function color_settings_extensions() {
+  $extensions = array();
+
+  $extensions['fill'] = drupal_system_listing('\.inc$', 'modules/color/extend/fill', 'name', 0);
+  $extensions['replace'] = drupal_system_listing('\.inc$', 'modules/color/extend/replace', 'name', 0);
+
+  return theme('color_settings_extensions', $extensions);
+}
+
+/**
+ * Theme requirements status report.
+ *
+ * @param $requirements
+ *   An array of requirements.
+ * @ingroup themeable
+ */
+function theme_color_settings_extensions($extensions) {
+  // Iterate through each type
+
+  $form = array(
+    '#type' => 'fieldset',
+    '#title' => 'Extensions'
+  );
+
+  $output = '';
+
+  foreach ($extensions as $key => $type) {
+    $form[$key] = array(
+      '#type' => 'fieldset',
+      '#title' => $key
+    );
+    $i = 0;
+
+    $output .= '<table class="color-settings-extensions section-admin">';
+
+    $output .= '<tr class=""><th>'. $key .'</th></tr>';
+
+    foreach ($type as $extension) {
+      $class = ++$i % 2 == 0 ? 'even' : 'odd';
+
+      $classes = array(
+        REQUIREMENT_INFO => 'info',
+        REQUIREMENT_OK => 'ok',
+        REQUIREMENT_WARNING => 'warning',
+        REQUIREMENT_ERROR => 'error',
+      );
+      $class = $classes[isset($requirement['severity']) ? (int)$requirement['severity'] : 0] .' '. $class;
+
+      // Output table row(s)
+      if (!empty($requirement['description'])) {
+        $output .= '<tr class="info merge-down"><th>'. "TRA" .'</th><td>'. "SOOL" .'</td></tr>';
+        $output .= '<tr class="'. "LA" .' merge-up"><td colspan="2">'. "MOOL" .'</td></tr>';
+      }
+      else {
+        $output .= '<tr class="'. $class .' info ok"><td>'. $extension->name .'</td><td>' . $extension->filename . '</td><td>'. "moo" .'</td></tr>';
+        $form[$key][$extension->name] = array(
+          '#title' => $extension->name,
+          '#description' => $extension->filename,
+          '#type' => 'item',
+        );
+      }
+
+    }
+    $output .= '</table>';
+
+  }
+
+  $output = drupal_render($form);
+  return $output;
+}
+
+/**
+ * Catch: old color themes
+ */
+function _color_page_alter() {
+  // Let's remove this annoying bugger until we can place it on just theme setting pages.
+  // Yikes.
+  /*drupal_set_message(t('<p>You are using an <strong>outdated</strong> color.module theme. <em>Webmasters:</em> It is possible you have not installed the updated example themes from <code>modules/color/example</code>.
+                       <em>Theme developers:</em> You have to update your theme\'s color configuration. See the <a href="@handbook">handbook</a>.</p>
+                       ', array('@handbook' => 'http://drupal.org/node/288164')), "error");
+  */
+}

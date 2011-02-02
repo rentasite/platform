@@ -1,0 +1,11 @@
+; $Id: varnish.info,v 1.2 2010/05/04 16:08:53 joshk Exp $
+name = Varnish 
+description = "Provides integration with the Varnish HTTP accelerator."
+core = 6.x
+package = Caching
+; Information added by drupal.org packaging script on 2010-11-12
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "varnish"
+datestamp = "1289564843"
+

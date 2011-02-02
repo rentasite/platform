@@ -1,0 +1,110 @@
+
+/* Left panel, with all of our palette stuff */
+#edit-left-sidebar-wrapper {
+  width: 300px;
+  float: left;
+}
+
+/* Farbtastic placement */
+.color-form {
+  width: 545px;
+  position: relative;
+}
+
+/* Farbtastic, on the right side */
+#placeholder {
+  float:right;
+  width: 245px;
+}
+
+/* Palette */
+.color-form .form-item {
+  height: 2em;
+  line-height: 2em;
+  padding-left: 1em; /* LTR */
+  margin: 0.5em 0;
+}
+.color-form label {
+  float: left; /* LTR */
+  clear: left; /* LTR */
+  width: 15em;
+  font-size:0.8em;
+}
+
+.color-form .form-text, .color-form .form-select {
+  float: left; /* LTR */
+}
+
+.color-form .form-text {
+  text-align: left;
+  margin-right: 5px; /* LTR */
+  cursor: pointer;
+}
+
+.color-form input#edit-scheme {
+  text-align: left;
+}
+
+#palette {
+  clear: both;
+}
+#palette .hook {
+  float: left; /* LTR */
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+}
+#palette .down, #palette .up, #palette .both {
+  background: url(images/hook.png) no-repeat 100% 0; /* LTR */
+}
+#palette .up {
+  background-position: 100% -27px; /* LTR */
+}
+#palette .both {
+  background-position: 100% -54px; /* LTR */
+}
+
+#palette .lock {
+  float: left; /* LTR */
+  position: relative;
+  top: -1.4em;
+  left: -10px; /* LTR */
+  width: 20px;
+  height: 25px;
+  background: url(images/lock.png) no-repeat 50% 2px;
+  cursor: pointer;
+}
+#palette .unlocked {
+  background-position: 50% -22px;
+}
+#palette .form-item, #scheme-select .form-item {
+}
+#palette .item-selected, {
+  background: #eee;
+}
+
+/* Make our buttons and such inline to save space and look tidy */
+
+#options-scheme-wrapper #save-scheme-wrapper, #options-scheme-wrapper #preview-scheme-wrapper,
+#options-scheme-wrapper #delete-scheme-wrapper, #options-scheme-wrapper #default-scheme-wrapper,
+#options-scheme-wrapper #cancel-scheme-wrapper {
+  display:inline;
+}
+
+#edit-edit-scheme-wrapper, #edit-default-scheme-wrapper {
+  display:inline;
+}
+
+input.hex, input.prevbox, input.suggestedbox {
+  width: 60px;
+  padding: 2px 0;
+  border: 1px solid #9BABB0;
+  -moz-border-radius-bottomleft:4px;
+  -moz-border-radius-bottomright:4px;
+  -moz-border-radius-topleft:4px;
+  -moz-border-radius-topright:4px;
+}
+
+input.prevbox, input.suggestedbox {
+  display: inline;
+}

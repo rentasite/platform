@@ -1,0 +1,15 @@
+; $Id: constant_contact.info,v 1.16 2010/03/28 12:02:30 justphp Exp $
+name = Constant contact
+description = "This module integrates features from the <a href='http://bit.ly/cctrial' target='_blank
+'>Constant Contact</a> API into your drupal website"
+package = Mail
+core = "6.x"
+version = "6.x-2.1"
+php = 4.3.0
+
+; Information added by drupal.org packaging script on 2010-03-28
+version = "6.x-2.1"
+core = "6.x"
+project = "constant_contact"
+datestamp = "1269778512"
+

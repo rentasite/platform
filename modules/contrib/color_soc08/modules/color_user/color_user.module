@@ -1,0 +1,327 @@
+<?php
+// $Id: color_user.module,v 1.1.2.2 2009/05/14 12:40:17 skiquel Exp $
+
+/**
+ * @file
+ * Lets users change color schemes.
+ */
+
+/**
+ * Implementation of hook_perm().
+ */
+function color_user_perm() {
+  return array('select different color scheme');
+}
+
+/**
+ * Implementation of hook_form_alter()
+ */
+function color_user_form_alter(&$form, $form_state, $form_id) {
+  global $base_url;
+  module_load_include('inc', 'color', 'color.misc');
+  module_load_include('inc', 'color', 'color.database');
+
+  if ($form_id == 'color_settings_form') {
+    if (variable_get('page_compression', 1) == 1 || variable_get('cache', 0) == 1) {
+      $unregistered_scheme_disabled = TRUE;
+    }
+    else {
+      $unregistered_scheme_disabled = FALSE;
+    }
+
+    $form['user'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'User schemes',
+      '#description' => 'User schemes',
+      '#weight' => -1
+    );
+    $form['user']['color_unregistered_scheme'] = array(
+      '#type' => 'checkbox',
+      '#title' => 'Unregistered users scheme selection',
+      '#description' => t('<strong>Warning:</strong> This will not work with page compression or caching enabled (!settings)', array('!settings' => l('Disable', 'admin/settings/performance'))),
+      '#disabled' => $unregistered_scheme_disabled,
+      '#default_value' => variable_get('color_unregistered_scheme', 0),
+    );
+  }
+
+  // For user "Theme configuration" at /user/{uid}/edit
+    global $user;
+    $themes = color_list_themes(FALSE, 1);
+
+    foreach ($themes as $theme) {
+      // Due to the structure of the arrays showing default theme blank.
+      $theme_key = ((isset($form['theme_select']['themes']['']['description']['#title'])) && (variable_get('theme_default', 'garland') == $theme->name)) ? variable_get('theme_default', 'garland') : $theme->name;
+
+      module_load_include('inc', 'color', 'color.database');
+      $screenshot = NULL;
+      /* KEEP THIS FOR SCHEME UID (COLOR_USER)
+      if (($scheme = color_get_scheme('uid', $user->uid, array('extra_attr', 'theme'))) && $theme_key == $scheme['theme']) {
+
+        $extra_attr = $scheme['extra_attr'];
+        $screenshot = isset($extra_attr['screenshot']) ? $extra_attr['screenshot'] : NULL;
+      }
+      */
+      
+      // If: Make sure only enabled themes show color description.
+      if (variable_get('theme_color_'. $theme_key, 0) == 1) {
+        if ($form['theme_select']['themes'][$theme_key]) {
+          $form['theme_select']['themes'][$theme_key]['description']['#title'] .= '<span class="pngfix"><img src="' . $base_url . '/' . drupal_get_path('module', 'color') . '/images/color-icon.png" title="' . t('This theme supports color customization.') . '" alt="' . t('Color configurable') . '" /></span>';
+        }
+        elseif ($form['theme_select']['themes']['']) {
+          $form['theme_select']['themes']['']['description']['#title'] .= '<span class="pngfix"><img src="' . $base_url . '/' . drupal_get_path('module', 'color') . '/images/color-icon.png" title="' . t('This theme supports color customization.') . '" alt="' . t('Color configurable') . '" /></span>';
+        }
+      }
+
+      if (isset($form['theme_select']['themes'][$theme_key]['screenshot']) && isset($screenshot)) {
+        $form['theme_select']['themes'][$theme_key]['screenshot']['#value'] = theme('image', $screenshot, '', '', array('class' => 'screenshot'), FALSE);
+      }
+      
+      $form['#submit'][] = 'color_user_scheme_select_submit';
+      
+    }
+
+}
+
+/**
+ * Implementation of hook_block()
+ */
+function color_user_block($op='list', $delta=0) {
+  global $user;
+
+  module_load_include('inc', 'color', 'color.misc');
+  module_load_include('inc', 'color', 'color.database');
+
+  $theme = (!isset($user->theme) || empty($user->theme)) ? variable_get('theme_default', 'garland'): $user->theme;
+
+  if ($op == 'list') {
+    $blocks[0]['info'] = t('Pick color scheme');
+    $blocks[0]['description'] = t('User color scheme selection');
+    return $blocks;
+  }
+  else if ($op == 'view' && user_access('select different color scheme') && !(($user->uid == 0) && (variable_get('page_compression', 0) != 0) || (variable_get('cache', 0) != 0)) && (variable_get('theme_color_'. $theme, 0) == 1) && (variable_get('theme_color_'. $theme . '_generated', 0) == 1)) {
+    if (!((variable_get('page_compression', 1) == 0) || (variable_get('cache', 0) == 0)) && in_array('anonymous user', $user->roles)) {
+      drupal_set_message('Anonymous users cannot change schemes w/ Page Compression or Caching on!', 'info', FALSE);
+    }
+
+    $block['content'] = '';
+    switch ($delta) {
+      case 0:
+        $block['content'] .= drupal_get_form('color_user_block_form');
+        break;
+    }
+
+    $block['subject'] = t('Site colors');
+
+    return $block;
+  }
+}
+
+/**
+ * Grab the scheme ID for a User ID
+ * @param $uid: User ID
+ *
+ * @return the ID for the scheme the user has chosen, or 0 if none.
+ */
+function color_user_get_scheme_id($uid) {
+  static $static;
+
+  if (isset($static[$uid])) {
+    return $static[$uid];
+  }
+
+  if ($uid != 0) {
+    $query = db_query("SELECT scheme_id FROM {color_user} WHERE uid = '%s'", $uid);
+    $row = db_fetch_array($query);
+
+    if (isset($row['scheme_id'])) {
+      $static[$uid] = $row['scheme_id'];
+    }
+    else {
+      $static[$uid] = 0;
+    }
+  }
+  elseif ($uid == 0 && isset($_SESSION['scheme_id'])) {
+    $static[$uid] = $_SESSION['scheme_id'];
+  }
+  else {
+    $static[$uid] = 0;
+  }
+
+  return $static[$uid];
+}
+
+/**
+ * Form for color_user block
+ */
+function color_user_block_form() {
+  global $user;
+  $uid = $user->uid;
+
+  $theme = (!isset($user->theme) || empty($user->theme)) ? variable_get('theme_default', 'garland'): $user->theme;
+
+  module_load_include('inc', 'color', 'color.database');
+
+  $form['color_scheme_select']['#tree'] = TRUE;
+
+  $scheme['id'] = color_user_get_scheme_id($uid);
+  color_get_scheme($scheme);
+  color_get_theme($theme);
+  color_get_theme_extras($theme);
+  $current = $scheme['id'];
+
+  $theme['schemes']['id'] = array('<Official site scheme>' => 0)+$theme['schemes']['id'];
+  $form['color_scheme_select']['color_select'] = array(
+    '#type' => 'select',
+    '#options' => array_flip($theme['schemes']['id']),
+    '#default_value' => $current,
+  );
+
+  $form['current_theme'] = array(
+    '#type' => 'hidden',
+    '#value' => $theme['name'],
+  );
+
+  $form['select_scheme'] = array('#type' => 'submit', '#value' => t('Select'), '#weight' => 3);
+
+  //  if ($user->uid == 1) {
+  if ($user->uid == 1 || user_access('access administration pages')) {
+    $form['modify_scheme'] = array('#type' => 'submit', '#value' => t('Modify'), '#weight' => 3);
+  }
+
+  $form['#submit'][] = 'color_user_scheme_select_submit';
+
+  return $form;
+}
+
+/**
+ *  Implements hook_user().
+ */
+function color_user_user($op, &$edit, &$account, $category) {
+  global $user;
+
+  $theme = !empty($edit['theme']) ? $edit['theme'] : variable_get('theme_default', 'garland');
+
+  if (variable_get('theme_color_' . $theme, 0) == 0) {
+    return;
+  }
+  
+  if ($op == 'form' && $category == 'account' && user_access('select different color scheme')) {
+    module_load_include('inc', 'color', 'color.database');
+    module_load_include('inc', 'color', 'color.misc');
+
+      $uid = $user->uid;
+
+      $form['color_scheme_select'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Color scheme'),
+        '#description' => t('Your theme (@theme) has color schemes!', array('@theme' => $theme)),
+        '#weight' => 3,
+        '#collapsible' => TRUE
+      );
+
+      $form['color_scheme_select']['#tree'] = TRUE;
+
+      $scheme['id'] = color_user_get_scheme_id($uid);
+      color_get_scheme($scheme);
+      color_get_theme($theme);
+      color_get_theme_extras($theme);
+      $current = $scheme['id'];
+
+      $theme['schemes']['id'] = array('<Official site scheme>' => 0) + $theme['schemes']['id'];
+
+      $form['color_scheme_select']['color_select'] = array(
+        '#type' => 'select',
+        '#title' => t('Scheme'),
+        '#options' => array_flip($theme['schemes']['id']),
+        '#default_value' => $current,
+      );
+
+      $form['current_theme'] = array(
+        '#type' => 'hidden',
+        '#value' => $theme['name'],
+      );
+
+
+      return $form;
+  }
+}
+
+/**
+ * Processes forms from color_block_form() and color_user().
+ * Sets user scheme.
+ */
+function color_user_scheme_select_submit($form, &$form_state) {
+  global $user;
+  $uid = $user->uid;
+  $theme['name'] = empty($form['current_theme']['#value']) ? variable_get('theme_default', 'garland') : $form['current_theme']['#value'];
+  $scheme['id'] = $form['#post']['color_scheme_select']['color_select'];
+
+  if ($form_state['clicked_button']['#value'] == 'Modify') {
+    if ($scheme['id'] != 0) {
+      drupal_goto('admin/build/themes/settings/' . $theme['name'] . '/' . $scheme['id']);
+    }
+    return;
+  }
+  else {
+    module_load_include('inc', 'color', 'color.database');
+    // Check for user scheme in table. Place in $userscheme array if exists
+    $results = db_fetch_array(db_query("SELECT COUNT(scheme_id) AS count FROM {color_user} WHERE uid = '%s'", $uid));
+    $row_count = $results['count'];
+
+    if ($uid != 0 && $row_count == 0) {
+      color_user_set_scheme($scheme['id'], $uid, 'insert');
+    }
+    elseif ($uid != 0 && $row_count > 0) {
+      color_user_set_scheme($scheme['id'], $uid, 'update');
+    }
+    elseif ($uid != 0 && ($row_count['id'] == 0 || !color_scheme_id_valid($scheme['id'], $theme))) {
+      color_user_set_scheme($scheme_id, $uid, 'delete');
+    }
+    elseif ($uid == 0 && user_access('select different color scheme') && (variable_get('page_compression', 1) == 0) && variable_get('cache', 0) == 0) {
+      color_user_set_scheme($scheme['id'], $uid);
+    }
+  }
+}
+
+
+/**
+ * Set UID or anonymous user to a scheme.
+ *
+ * @param $scheme_id
+ *   The scheme ID
+ * @param $uid
+ *   User's ID
+ * @param $method
+ *   One of: 'update', 'delete', 'insert'
+ */
+function color_user_set_scheme($scheme_id, $uid = 0, $method = NULL) {
+  if (!isset($method)) {
+    if (db_result(db_query("SELECT COUNT(*) AS count FROM {color_user} WHERE uid = '%s'", $uid)) > 0) {
+      $method = 'update';
+    }
+    else {
+      $method = 'insert';
+    }
+  }
+
+  if ($uid == 0) {
+    if ($method == 'delete') {
+      //unset($_SESSION['scheme_id']);
+    }
+    else {
+      $_SESSION['scheme_id'] = $scheme_id;
+    }
+  }
+  elseif (isset($scheme_id) && $uid != 0) {
+    if ($method == 'update') {
+      db_query("UPDATE {color_user} SET scheme_id = '%s' WHERE uid = '%s'", $scheme_id, $uid);
+    }
+    elseif ($method == 'insert') {
+      db_query("INSERT INTO {color_user} (uid, scheme_id) VALUES ('%s', '%s')", $uid, $scheme_id);
+    }
+    elseif ($method == 'delete') {
+      db_query("DELETE FROM {color_user} WHERE uid = '%s'", $uid);
+    }
+    drupal_set_message(t('Color scheme updated!'), 'status', FALSE);
+  }
+}

@@ -1,0 +1,15 @@
+; $Id: scrolltext.info,v 1.8 2009/06/12 06:30:19 thenicespider Exp $
+name = ScrollText
+description = "This module used for scrolling text from node title."
+package = "Easy Module"
+version = "6.x-1.0-ALPHA1"
+core = "6.x"
+project = "scrolltext"
+dependencies[] = libraries
+
+; Information added by drupal.org packaging script on 2009-06-12
+version = "6.x-1.0-alpha1"
+core = "6.x"
+project = "scrolltext"
+datestamp = "1244788565"
+

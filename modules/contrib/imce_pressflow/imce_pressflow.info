@@ -1,0 +1,5 @@
+name = "IMCE Pressflow"
+description = "Workaround module to let IMCE 2.x running under pressflow 6"
+core = "6.x"
+dependencies[] = imce
+version = "6.x-0.1"

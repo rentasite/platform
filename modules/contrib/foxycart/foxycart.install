@@ -1,0 +1,26 @@
+<?php
+
+// $Id: foxycart.install,v 1.1 2010/03/09 03:09:54 kilogauss Exp $
+
+/**
+ * @file foxycart.install
+ *
+ * Module to provide integration of Drupal and FoxyCart.
+ *
+ * Copyright (c) 2010 Jason York -  http://www.yorkspace.com
+ *
+ */
+
+/**
+ * Implementation of hook_uninstall().
+ */
+ function foxycart_uninstall() {
+  variable_del('foxycart_yourdomain');
+  variable_del('foxycart_show_logo');
+  variable_del('foxycart_datafeedkey');
+  variable_del('foxycart_user_sync');
+  variable_del('foxycart_enable_sso');
+  variable_del('foxycart_allow_non_auth_checkout');
+}
+
+?>

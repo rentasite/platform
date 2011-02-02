@@ -1,0 +1,1280 @@
+<?php
+// $Id: constant_contact.module,v 1.21 2010/03/28 12:02:30 justphp Exp $
+module_load_include('php', 'constant_contact', 'constant_contact.config');
+
+/**
+ * @file
+ */
+
+/**
+ * Displays the admin help page
+ */
+function constant_contact_help($path, $arg)
+{
+	switch ($path) {
+
+	case 'admin/help#constant_contact':
+	return '<p>'. t('
+	  <p>This module works with the new <a target="_blank" href="@api">Constant Contact REST API</a></p>
+	  <p><a target="_blank" href="@cc">Signup for a free 60-day trial</a> if you do not already have an account.</p>
+	  <p>To setup a custom signup form please follow the instructions below:</p>
+	  <ol>
+	  <li>First you should visit the <a href="@setup">setup page</a> to enter your account username and password.</li>
+	  <li>Now you should edit the <a href="@settings">module settings</a> and configure the options such as which contact lists the subscribers are added to or excluded from.</li>
+	  <li>If you want to display a signup checkbox on the register page simply check the appropriate checkbox on the settings page under the "Register Page Settings" heading.</li>
+	  <li>Alternatively if you want to use the form block method see <a href="@blocks">this page</a>.</li>
+	  <li>To use the export and sync features you need to configure <a target="_blank" href="@cron">cron</a>.</li>
+	  </ol>
+	  <p>Detailed instructions will be available in a future release.</p>
+	  <h6>Known Issues</h6>
+	  <ul>
+	   <li>Custom fields may not work on your specific setup, we have tested with the profile module only.</li>
+	  </ul>
+	  ', array(
+	  	'@api' => 'http://developer.constantcontact.com/doc/reference',
+	  	'@dev' => 'http://developer.constant_contact.com/license/login',
+	  	'@cc' => CC_TRIAL_URL,
+		'@cron' => 'http://drupal.org/cron',
+	  	'@settings' => url('admin/settings/constant_contact/settings'),
+        '@setup' => url('admin/settings/constant_contact/setup'),
+		'@blocks' => url('admin/build/block')
+	  )) .'</p>';
+
+	case 'admin/settings/constant_contact/lists':
+	return t('<p>You can manage your contact lists below, this saves having to visit the constant contact website if you want to edit a list name</p><p>Editing a list name will not break your registration form, deleting a list will break it but only if you are using that list in the signup form, you should edit the settings to remove the list from the signup form after you have deleted it here.</p>');
+
+	case 'admin/settings/constant_contact/import':
+	return t('<p>You can import subscribers in bulk using this page, this does not create a drupal account for the users it simply adds them to the selected constant contact mailing list(s), DO NOT use this page to import less than 25 subscribers or your constant contact account could be terminated.</p>');
+
+	case 'admin/settings/constant_contact/export':
+	return t('<p>You can export subscribers from a certain contact list in CSV or TEXT format using this page, this operation does not happen straight away it must be scheduled using the activities API, you can download the export file from the "View Activities" tab when it\'s completed.</p>');
+
+	case 'admin/settings/constant_contact/activities':
+	return t('<p>View your Constant Contact account activities.</p>');
+
+	case 'admin/settings/constant_contact/activities/%':
+	return t('<p>Information about the activity if displayed below.</p>');
+
+	case 'admin/settings/constant_contact/settings':
+	return t('<p>Configure the module settings.</p>');
+
+	case 'admin/settings/constant_contact/lists/add':
+	return t('<p>This will add a new contact list to your Constant Contact account.</p>');
+
+	case 'admin/settings/constant_contact/lists/edit/%':
+	return t('<p>This will update the contact list with your Constant Contact account.</p>');
+
+	case 'admin/settings/constant_contact/lists/delete/%':
+	return t('<p>This will delete the contact list from your Constant Contact account, users subscribed to the list will be unsubscribed from the list first but will remain subscribed to other lists.</p>');
+	}
+}
+
+
+/**
+ * Adds an admin menu for the Cnstant Contact module
+ */
+function constant_contact_menu()
+{
+
+	$items = array();
+
+	// display an intro page
+	$items['admin/settings/constant_contact'] = array(
+		'title' => 'Constant contact',
+		'description' => 'Setup and configure your Constant Contact signup form',
+		'page callback' => 'constant_contact_intro',
+		'access arguments' => array('administer constant_contact'),
+		'type' =>  MENU_NORMAL_ITEM,
+		'file' =>  'admin.system.inc',
+	);
+
+	$items['admin/settings/constant_contact/intro'] = array(
+		'type' => MENU_DEFAULT_LOCAL_TASK,
+		'title' => 'Constant Contact',
+		'weight' => -10,
+	);
+
+    // display the setup page
+    $items['admin/settings/constant_contact/setup'] = array(
+        'title' => 'Setup',
+        'description' => 'Setup the constant contact module',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('constant_contact_setup'),
+        'access arguments' => array('administer constant_contact'),
+        'type' => MENU_LOCAL_TASK,
+        'file' =>  'admin.system.inc',
+        'weight' => 0,
+    );
+
+	// display the settings page
+	$items['admin/settings/constant_contact/settings'] = array(
+		'title' => 'Change settings',
+		'description' => 'Change your constant contact settings',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('constant_contact_settings'),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_LOCAL_TASK,
+		'file' =>  'admin.system.inc',
+		'weight' => 1,
+	);
+
+	// display the activities page
+	$items['admin/settings/constant_contact/activities'] = array(
+		'title' => 'View Activities',
+		'description' => 'View Your Constant Contact Activities',
+		'page callback' => 'constant_contact_view_activities',
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_LOCAL_TASK,
+		'file' =>  'admin.activities.inc',
+		'weight' => 5,
+	);
+
+	// display the import page
+	$items['admin/settings/constant_contact/import'] = array(
+		'title' => 'Import',
+		'description' => 'Import subscribers to your constant contact mailing lists',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('constant_contact_import'),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_LOCAL_TASK,
+		'file' =>  'admin.import.inc',
+		'weight' => 10,
+	);
+
+	// display the export page
+	$items['admin/settings/constant_contact/export'] = array(
+		'title' => 'Export',
+		'description' => 'Export subscribers from your constant contact mailing lists',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('constant_contact_export'),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_LOCAL_TASK,
+		'file' =>  'admin.export.inc',
+		'weight' => 15,
+	);
+
+	$items['admin/settings/constant_contact/activities/%'] = array(
+		'title' => 'View Activity',
+		'description' => 'View Information About This Activity',
+		'page callback' => 'constant_contact_view_activity',
+		'page arguments' => array(4),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_CALLBACK,
+		'file' =>  'admin.activities.inc',
+	);
+
+	$items['admin/settings/constant_contact/activities/download/%'] = array(
+		'title' => 'Download File',
+		'description' => 'Download the Activity File',
+		'page callback' => 'constant_contact_download_activity',
+		'page arguments' => array(5),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_CALLBACK,
+		'file' =>  'admin.activities.inc',
+	);
+
+	// display the contact lists page
+	$items['admin/settings/constant_contact/lists'] = array(
+		'title' => 'Contact Lists',
+		'description' => 'Manage your contact lists',
+		'page callback' => 'constant_contact_manage_lists',
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_LOCAL_TASK,
+		'file' =>  'admin.lists.inc',
+		'weight' => 20,
+	);
+
+	$items['admin/settings/constant_contact/lists/add'] = array(
+		'title' => 'Add List',
+		'description' => 'Add a new contact list to constant contact',
+		'page callback' => 'constant_contact_add_list',
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_CALLBACK,
+		'file' =>  'admin.lists.inc',
+	);
+
+	$items['admin/settings/constant_contact/lists/edit/%'] = array(
+		'title' => 'Edit List',
+		'description' => 'Edit a contact list',
+		'page callback' => 'constant_contact_edit_list',
+		'page arguments' => array(5),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_CALLBACK,
+		'file' =>  'admin.lists.inc',
+	);
+
+	$items['admin/settings/constant_contact/lists/delete/%'] = array(
+		'title' => 'Delete List',
+		'description' => 'Delete a contact list',
+		'page callback' => 'constant_contact_delete_list',
+		'page arguments' => array(5),
+		'access arguments' => array('administer constant_contact'),
+		'type' => MENU_CALLBACK,
+		'file' =>  'admin.lists.inc',
+	);
+
+	return $items;
+}
+
+/**
+ * Sets available access permissions for the module
+ */
+function constant_contact_perm()
+{
+	return array(
+		'access constant_contact',
+		'administer constant_contact',
+	);
+}
+
+/**
+ * Alter the user registration form
+ */
+function constant_contact_form_user_register_alter(&$form, &$form_state)
+{
+	$subscribe_method = variable_get('cc_register_page_method', CC_REGISTER_PAGE_METHOD);
+	$list_format = variable_get('cc_list_selection_format',CC_LIST_SELECTION_FORMAT);
+	$default_opt_in = variable_get('cc_default_opt_in', CC_DEFAULT_OPT_IN);
+	$show_format_choice = variable_get('cc_show_format_choice',CC_SHOW_FORMAT_CHOICE);
+	$default_subscribe_format = variable_get('cc_subscribe_format',CC_SUBSCRIBE_FORMAT);
+
+	if($subscribe_method == 'none'):
+		return;
+	endif;
+
+	$cc = constant_contact_create_object();
+
+	if(!is_object($cc)):
+		return;
+	endif;
+
+	$lists = array();
+	$selected_lists = array();
+
+
+	if($subscribe_method == 'lists'):
+		$exclude_lists = variable_get('cc_lists',array());
+
+		$lists = constant_contact_get_lists($cc);
+
+		// select all lists by default, if enabled
+		if($lists && $default_opt_in):
+		foreach($lists as $k => $v):
+			$selected_lists[$k] = $v['id'];
+		endforeach;
+		endif;
+
+		$options = array();
+		foreach($lists as $list_id => $list_name):
+			if(!in_array($list_id, $exclude_lists)):
+				$options[$list_id] = $list_name;
+			endif;
+		endforeach;
+
+		if(count($options) > 0):
+			if($list_format == 'select'):
+				$field_type = 'select';
+			else:
+				$field_type = 'checkboxes';
+			endif;
+
+			$form['account']['cc_newsletter_lists'] = array(
+				'#type' => $field_type,
+				'#title' => variable_get('cc_signup_title', CC_SIGNUP_TITLE),
+				'#description' => variable_get('cc_signup_description',CC_SIGNUP_DESCRIPTION),
+				'#options' => $options,
+				'#weight' => 11,
+				'#default_value' => $selected_lists,
+			);
+
+			if($list_format == 'select'):
+				$field_size = ($options && count($options)>25) ? 25 : count($options);
+				$form['account']['cc_newsletter_lists']['#multiple'] = true;
+				$form['account']['cc_newsletter_lists']['#size'] = count($options);
+			endif;
+		endif;
+	else:
+		$form['account']['cc_newsletter'] = array(
+			'#type' => 'checkbox',
+			'#title' => variable_get('cc_signup_title', CC_SIGNUP_TITLE),
+			'#description' => variable_get('cc_signup_description',CC_SIGNUP_DESCRIPTION),
+			'#weight' => 10,
+			'#default_value' => $default_opt_in,
+		);
+	endif;
+
+	if($show_format_choice):
+		$form['account']['cc_email_format'] = array(
+			'#type' => 'radios',
+			'#title' => t('Email Format'),
+			'#description' => 'You can receive emails in Text or HTML format',
+			'#weight' => 12,
+			'#default_value' => $default_subscribe_format,
+			'#options' => array('Text' => 'Text', 'HTML' => 'HTML'),
+		);
+	endif;
+
+	return $form;
+}
+
+
+
+/**
+ * This method adds extra functionality to the user methods
+ * Create, Update, Delete
+ */
+function constant_contact_user($op, &$edit, &$account, $category = NULL)
+{
+	global $user;
+
+	$action_type = 'contact';
+	if(isset($user->uid) && $user->uid):
+		$uid = $user->uid;
+		$allowed = array('Administrator','Editor');
+		foreach($user->roles as $role):
+			if(in_array($role, $allowed)):
+				$action_type = 'customer';
+			endif;
+		endforeach;
+	endif;
+
+	$subscribe_method = variable_get('cc_register_page_method', CC_REGISTER_PAGE_METHOD);
+	$list_format = variable_get('cc_list_selection_format',CC_LIST_SELECTION_FORMAT);
+	$show_format_choice = variable_get('cc_show_format_choice',CC_SHOW_FORMAT_CHOICE);
+	$default_subscribe_format = variable_get('cc_subscribe_format',CC_SUBSCRIBE_FORMAT);
+
+	$lists = variable_get('cc_lists','');
+	$selected_lists = array();
+
+	if($subscribe_method == 'none'):
+		return;
+	endif;
+
+	// Fixes a bug: http://drupal.org/node/697400
+	if($op == 'insert' || $op == 'after_update'):
+		if(!isset($edit['cc_newsletter']) && !isset($account->cc_newsletter) && !count($edit['cc_newsletter_lists']) && !count($account->cc_newsletter_lists)):
+			return;
+		endif;
+	endif;
+
+
+	if($op == 'form' && $category == 'account'):
+
+		// alter the user edit form
+		$selected_lists = array();
+
+		$cc = constant_contact_create_object();
+
+		if(!is_object($cc)):
+			return;
+		endif;
+
+		// get contact and selected lists
+		$contact = $cc->query_contacts($account->mail);
+		$contact = $cc->get_contact($contact['id']);
+
+		if($contact['lists']):
+			$selected_lists = $contact['lists'];
+		endif;
+
+		$form['constant_contact'] = array(
+			'#type' => 'fieldset',
+			'#title' => t('Newsletter'),
+			'#collapsible' => TRUE,
+			'#collapsed' => false,
+			'#tree' => false,
+			'#description' => t('Manage your newsletter subscription'),
+		);
+
+		// check with the returned API data if they are active or not
+		// if syncing is disabled this will mean their status is reflected correctly
+		if($contact):
+			if($contact['Status'] == 'Active'):
+				$account->cc_newsletter = 1;
+			else:
+				$account->cc_newsletter = 0;
+			endif;
+
+			$default_subscribe_format = $contact['EmailType'];
+		endif;
+
+
+		if($subscribe_method == 'lists'):
+			$exclude_lists = variable_get('cc_lists',array());
+
+			$lists = constant_contact_get_lists($cc);
+
+			$options = array();
+			foreach($lists as $list_id => $list_name):
+				if(!in_array($list_id, $exclude_lists)):
+					$options[$list_id] = $list_name;
+				endif;
+			endforeach;
+
+			  if(count($options) > 0):
+				if($list_format == 'select'):
+					$field_type = 'select';
+				else:
+					$field_type = 'checkboxes';
+				endif;
+
+				$form['constant_contact']['cc_newsletter_lists'] = array(
+					'#type' => $field_type,
+					'#title' => variable_get('cc_signup_title', CC_SIGNUP_TITLE),
+					'#description' => variable_get('cc_signup_description',CC_SIGNUP_DESCRIPTION),
+					'#options' => $options,
+					'#default_value' => $selected_lists,
+					'#weight' => 11,
+				);
+
+				if($list_format == 'select'):
+					$field_size = ($options && count($options)>25) ? 25 : count($options);
+					$form['constant_contact']['cc_newsletter_lists']['#multiple'] = true;
+					$form['constant_contact']['cc_newsletter_lists']['#size'] = count($options);
+				endif;
+			endif;
+		else:
+			$form['constant_contact']['cc_newsletter'] = array(
+				'#type' => 'checkbox',
+				'#title' => variable_get('cc_signup_title', CC_SIGNUP_TITLE),
+				'#description' => variable_get('cc_signup_description',CC_SIGNUP_DESCRIPTION),
+				'#weight' => 10,
+				'#default_value' => $account->cc_newsletter,
+			);
+		endif;
+
+		if($show_format_choice):
+			$form['constant_contact']['cc_email_format'] = array(
+				'#type' => 'radios',
+				'#title' => t('Email Format'),
+				'#description' => 'You can receive emails in Text or HTML format',
+				'#weight' => 12,
+				'#default_value' => $default_subscribe_format,
+				'#options' => array('Text' => 'Text', 'HTML' => 'HTML'),
+			);
+		endif;
+
+		return $form;
+	elseif($op == 'insert'):
+
+		$cc = constant_contact_create_object();
+
+		if(!is_object($cc)):
+			return;
+		endif;
+
+		$fields = variable_get('cc_extra_fields',array());
+		$field_mappings = constant_contact_build_field_mappings();
+
+		if($subscribe_method == 'checkbox'):
+			if(!$edit['cc_newsletter']):
+				return;
+			endif;
+
+			$lists = variable_get('cc_lists',array());
+		else:
+			$lists = $edit['cc_newsletter_lists'];
+
+			$newlists = array();
+			foreach($lists as $list_id => $enabled):
+				if(intval($enabled) !== 0):
+					$list = $cc->get_list($list_id);
+					$newlists[$list_id] = $list['Name'];
+				endif;
+			endforeach;
+			$lists = $newlists;
+		endif;
+
+		if(!count($lists)):
+			return;
+		endif;
+
+		//module_invoke_all('constant_contact', 'user_inserted', $edit, $lists);
+		$edit['cc_newsletter'] = 1; /* they may not have this flag set but may be subscribed */
+
+		// parse custom fields
+		$extra_fields = array();
+		if(is_array($fields)):
+		foreach($fields as $field):
+			$fieldname = str_replace(' ','', $field);
+			if(isset($field_mappings[$fieldname]) && isset($_POST[$field_mappings[$fieldname]])):
+				$extra_fields[$fieldname] = $_POST[$field_mappings[$fieldname]];
+			endif;
+		endforeach;
+		endif;
+
+		// find contact
+		$contact = $cc->query_contacts($edit['mail']);
+		$cc->set_action_type($action_type);
+
+		$email_format = ($contact) ? $contact['EmailType'] : $default_subscribe_format;
+		if($show_format_choice && isset($edit['cc_email_format'])):
+			$email_format = $edit['cc_email_format'];
+		endif;
+
+		$extra_fields['EmailType'] = $email_format;
+
+		if($contact):
+
+			$contact = $cc->get_contact($contact['id']);
+
+			// merge contact lists user is already subscribed to
+			if($lists && $contact['lists']):
+				foreach($contact['lists'] as $list_id):
+					if(!isset($lists[$list_id])):
+						$list = $cc->get_list($list_id);
+						$lists[$list_id] = $list['Name'];
+					endif;
+				endforeach;
+			endif;
+
+			$status = $cc->update_contact($contact['id'], $edit['mail'], array_keys($lists), $extra_fields);
+		else:
+			$status = $cc->create_contact($edit['mail'], array_keys($lists), $extra_fields);
+		endif;
+
+		if(!$status):
+			drupal_set_message(
+				t(constant_contact_display_last_error($cc->http_response_code)),
+				'error'
+			);
+		endif;
+
+	elseif($op == 'delete'):
+
+		$cc = constant_contact_create_object();
+
+		if(!is_object($cc)):
+			return;
+		endif;
+
+		if($account->cc_newsletter):
+			// find contact
+			$contact = $cc->query_contacts($account->mail);
+
+			/* important, this tells CC that the contact or customer made this action */
+			$cc->set_action_type($action_type);
+
+			if($contact):
+				$cc->delete_contact($contact['id']);
+			endif;
+		endif;
+
+	elseif($op == 'after_update'):
+		$cc = constant_contact_create_object();
+
+		if(!is_object($cc)):
+			return;
+		endif;
+
+		$fields = variable_get('cc_extra_fields',array());
+		$field_mappings = constant_contact_build_field_mappings();
+
+		if($subscribe_method == 'lists'):
+			if($category == 'account'):
+				$lists = $edit['cc_newsletter_lists'];
+			else:
+				$lists = $account->cc_newsletter_lists;
+			endif;
+
+			$newlists = array();
+			foreach($lists as $list_id => $enabled):
+				if(intval($enabled) !== 0):
+					$list = $cc->get_list($list_id);
+					$newlists[$list_id] = $list['Name'];
+				endif;
+			endforeach;
+
+			$lists = $newlists;
+		else:
+			if($category == 'account'):
+				$edit['cc_newsletter_lists'] = array();
+			else:
+				$account->cc_newsletter_lists = array();
+			endif;
+
+			$lists = constant_contact_get_lists($cc);
+            $enabled_lists = variable_get('cc_lists', array());
+
+			$newlists = array();
+			foreach($lists as $list_id => $list_name):
+				if(in_array($list_id, $enabled_lists)):
+					$newlists[$list_id] = $list_name;
+				endif;
+			endforeach;
+			$lists = $newlists;
+		endif;
+
+		// parse custom fields
+		$extra_fields = array();
+		foreach($fields as $field):
+		$fieldname = str_replace(' ','', $field);
+		if(isset($field_mappings[$fieldname])):
+			$actual_fieldname = $field_mappings[$fieldname];
+			// the data we receive here could be from 2 different forms so handle them both
+			if($category == 'account'):
+				// if the fieldname has been posted add to our custom CC fields array
+				if(isset($edit[$actual_fieldname])):
+					$extra_fields[$fieldname] = $edit[$actual_fieldname];
+				endif;
+			else:
+				if(isset($account->$actual_fieldname)):
+					$extra_fields[$fieldname] = $account->$actual_fieldname;
+				endif;
+			endif;
+		endif;
+		endforeach;
+
+		// find contact
+		if($category == 'account'):
+			$contact = $cc->query_contacts($edit['mail']);
+		else:
+			$contact = $cc->query_contacts($account->mail);
+		endif;
+
+		$cc->set_action_type('contact');
+
+
+		$status = true;
+		if($contact):
+
+			$email_format = $contact['EmailType'];
+			if($show_format_choice):
+				if($category == 'account'):
+					$email_format = $edit['cc_email_format'];
+				else:
+					$email_format = $account->cc_email_format;
+				endif;
+			endif;
+
+			$extra_fields['EmailType'] = $email_format;
+
+			$contact = $cc->get_contact($contact['id']);
+
+			// merge contact lists user is already subscribed to
+			if($lists && $contact['lists']):
+				foreach($contact['lists'] as $list_id):
+					if(!isset($lists[$list_id])):
+						$list = $cc->get_list($list_id);
+						$lists[$list_id] = $list['Name'];
+					endif;
+				endforeach;
+			endif;
+
+			if($category == 'account'):
+				if($subscribe_method == 'checkbox' && $edit['cc_newsletter']):
+					$status = $cc->update_contact($contact['id'], $edit['mail'], array_keys($lists), $extra_fields);
+				elseif($subscribe_method == 'checkbox' && !$edit['cc_newsletter']):
+					$status = $cc->update_contact($contact['id'], $edit['mail'], array(), $extra_fields);
+				elseif($subscribe_method == 'lists' && count($lists) > 0):
+					$status = $cc->update_contact($contact['id'], $edit['mail'], array_keys($lists), $extra_fields);
+					$edit['cc_newsletter'] = 1;
+				elseif($subscribe_method == 'lists' && !count($lists)):
+					$status = $cc->update_contact($contact['id'], $edit['mail'], array(), $extra_fields);
+				endif;
+			else:
+				if($subscribe_method == 'checkbox' && $account->cc_newsletter):
+					$status = $cc->update_contact($contact['id'], $account->mail, array_keys($lists), $extra_fields);
+				elseif($subscribe_method == 'checkbox' && !$account->cc_newsletter):
+					$status = $cc->update_contact($contact['id'], $account->mail, array(), $extra_fields);
+				elseif($subscribe_method == 'lists' && count($lists) > 0):
+					$status = $cc->update_contact($contact['id'], $account->mail, array_keys($lists), $extra_fields);
+					$account->cc_newsletter = 1;
+				elseif($subscribe_method == 'lists' && !count($lists)):
+					$status = $cc->update_contact($contact['id'], $account->mail, array(), $extra_fields);
+				endif;
+			endif;
+		elseif($subscribe_method == 'checkbox' && $edit['cc_newsletter']):
+			$status = $cc->create_contact($edit['mail'], array_keys($lists), $extra_fields);
+		elseif($subscribe_method == 'lists' && count($lists) > 0):
+			$status = $cc->create_contact($edit['mail'], array_keys($lists), $extra_fields);
+			$edit['cc_newsletter'] = 1;
+		endif;
+
+		if(!$status):
+			drupal_set_message(
+				t(constant_contact_display_last_error($cc->http_response_code)),
+				'error'
+			);
+		endif;
+	endif;
+}
+
+
+/**
+ * Alter bulk user operations to delete and unsubscribe
+ */
+function constant_contact_user_operations()
+{
+	$operations = array(
+		'unsubscribe' => array(
+			'label' => t('Unsubscribe the selected users'),
+			'callback' => 'constant_contact_user_operations_unsubscribe',
+		),
+		'unsubscribe_and_delete' => array(
+			'label' => t('Unsubscribe and delete the selected users'),
+			'callback' => 'constant_contact_user_operations_unsubscribe_and_delete',
+		),
+	);
+	return $operations;
+}
+
+/**
+ * Mass unsubscribe and delete option
+ */
+function constant_contact_user_operations_unsubscribe_and_delete($accounts)
+{
+	$cc = constant_contact_create_object();
+
+	if(!is_object($cc)):
+		return;
+	endif;
+
+	// use the API to remove these users then delete their drupal account
+	foreach($accounts as $uid):
+		$account = user_load(array('uid' => (int)$uid));
+
+		if($account !== FALSE):
+			// Skip unsubscribing user if they are already unsubscribed.
+			// find contact
+			$contact = $cc->query_contacts($account->mail);
+
+			if($contact):
+				$cc->delete_contact($contact['id']);
+			endif;
+
+			user_delete(array(), (int)$uid);
+		endif;
+	endforeach;
+}
+
+/**
+ * Mass unsubscribe option
+ */
+function constant_contact_user_operations_unsubscribe($accounts)
+{
+	$cc = constant_contact_create_object();
+
+	if(!is_object($cc)):
+		return;
+	endif;
+
+	// use the API to remove these users
+	foreach ($accounts as $uid):
+		$account = user_load(array('uid' => (int)$uid));
+
+		// Skip unsubscribing user if they are already unsubscribed.
+		if ($account !== FALSE):
+			user_save($account, array('cc_newsletter' => 0));
+
+			// find contact
+			$contact = $cc->query_contacts($account->mail);
+
+			if($contact):
+				$cc->delete_contact($contact['id']);
+			endif;
+		endif;
+	endforeach;
+}
+
+
+
+/**
+ * Enables us to place a signup form into a block
+ */
+function constant_contact_block($op = 'view', $delta = 0, $edit = array())
+{
+	switch($op) {
+		case 'list':
+			$blocks[0] = array(
+				'info' => t('Constant Contact Signup Form'),
+				'visibility'      => 0,
+				'roles'      => array(1),
+				'pages'      => 'user*',
+			);
+		return $blocks;
+		case 'configure':
+			$form = array();
+		return;
+		case 'save':
+		return;
+		case 'view':
+			switch ($delta) {
+				case 0:
+					$block['subject'] = t('Signup');
+					$block['content'] = drupal_get_form('constant_contact_signup_form');
+				break;
+			}
+		return $block;
+	}
+}
+
+/**
+ * Shows the custom signup form, added using a block
+ */
+function constant_contact_signup_form(&$form_state)
+{
+	$cc = constant_contact_create_object();
+
+	$form = array();
+	$show_selection = variable_get('cc_block_show_list_selection',CC_BLOCK_SHOW_LIST_SELECTION);
+	$selection_format = variable_get('cc_block_list_selection_format',CC_LIST_SELECTION_FORMAT);
+	$show_format_choice = variable_get('cc_show_format_choice',CC_SHOW_FORMAT_CHOICE);
+	$default_subscribe_format = variable_get('cc_subscribe_format',CC_SUBSCRIBE_FORMAT);
+	$form_block_fields = variable_get('cc_form_block_fields', array());
+	$email_field_position = variable_get('cc_email_field_position', 1);
+
+
+	if(is_array($form_block_fields)):
+		$form_block_fields['_email'] = 1; /* dummy entry so we get enough for the email field */
+		$current_pos = 1;
+		foreach($form_block_fields as $field => $enabled):
+			if($enabled):
+				if($current_pos == $email_field_position):
+					$form['cc_email'] = array(
+						'#type' => 'textfield',
+						'#title' => t('Email'),
+						'#size' => 30,
+						'#required' => TRUE,
+					);
+				endif;
+
+				if($field != '_email'):
+					$fieldname = str_replace(' ','', $field);
+					$form["cc_$fieldname"] = array(
+						'#type' => 'textfield',
+						'#title' => $field,
+						'#size' => 30,
+						'#required' => true,
+						'#default_value' => $form_state['values']["cc_$fieldname"],
+					);
+				endif;
+				++$current_pos;
+			endif;
+		endforeach;
+	endif;
+
+	if($show_selection && is_object($cc)):
+		$exclude_lists = variable_get('cc_block_lists','');
+
+		$lists = constant_contact_get_lists($cc);
+
+		if(!is_array($exclude_lists)):
+			$exclude_lists = array();
+		endif;
+
+		$options = array();
+		foreach($lists as $list_id => $list_name):
+			if(!in_array($list_id, $exclude_lists)):
+				$options[$list_id] = $list_name;
+			endif;
+		endforeach;
+
+		if(count($options) > 0):
+			if($selection_format == 'select'):
+				$field_type = 'select';
+			else:
+				$field_type = 'checkboxes';
+			endif;
+			$form['cc_newsletter_lists'] = array(
+				'#type' => $field_type,
+				'#title' => variable_get('cc_signup_title',CC_SIGNUP_TITLE),
+				'#description' => variable_get('cc_signup_description',CC_SIGNUP_DESCRIPTION),
+				'#options' => $options,
+				'#required' => TRUE,
+			);
+			if($selection_format == 'select'):
+				$form['cc_newsletter_lists']['#multiple'] = true;
+				$form['cc_newsletter_lists']['#size'] = count($options);
+			endif;
+		endif;
+	endif;
+
+	if($show_format_choice):
+		$form['cc_email_format'] = array(
+			'#type' => 'radios',
+			'#title' => t('Email Format'),
+			'#description' => 'You can receive emails in Text or HTML format',
+			'#default_value' => $default_subscribe_format,
+			'#options' => array('Text' => 'Text', 'HTML' => 'HTML'),
+		);
+	endif;
+
+	$form['submit'] = array('#type' => 'submit', '#value' => t('Signup'));
+	return $form;
+}
+
+
+/**
+ * Custom signup form submit handler
+ */
+function constant_contact_signup_form_submit($form, &$form_state)
+{
+	$auto_lists = variable_get('cc_block_lists','');
+	$show_selection = variable_get('cc_block_show_list_selection',CC_BLOCK_SHOW_LIST_SELECTION);
+	$selection_format = variable_get('cc_block_list_selection_format',CC_LIST_SELECTION_FORMAT);
+	$redirect_to = variable_get('cc_block_redirect_url','');
+	$show_format_choice = variable_get('cc_show_format_choice',CC_SHOW_FORMAT_CHOICE);
+	$default_subscribe_format = variable_get('cc_subscribe_format',CC_SUBSCRIBE_FORMAT);
+
+	$cc = constant_contact_create_object();
+	if(!is_object($cc)):
+		return;
+	endif;
+
+	$fields = array();
+
+	if($show_selection):
+		$lists = $form_state['values']['cc_newsletter_lists'];
+
+		if($selection_format == 'checkbox' && $lists):
+			$newlists = array();
+			foreach($lists as $list_id => $enabled):
+				if(intval($enabled) !== 0):
+					$list = $cc->get_list($list_id);
+					$newlists[$list_id] = $list['Name'];
+				endif;
+			endforeach;
+			$lists = $newlists;
+		endif;
+
+	elseif(!$show_selection):
+		$lists = constant_contact_get_lists($cc);
+
+		$newlists = array();
+		foreach($lists as $list_id => $list_name):
+			if(in_array($list_id, $auto_lists)):
+				$newlists[$list_id] = $list_name;
+			endif;
+		endforeach;
+		$lists = $newlists;
+	else:
+		$lists = array();
+	endif;
+
+	$form_block_fields = variable_get('cc_form_block_fields', array());
+
+	if(is_array($form_block_fields)):
+		foreach($form_block_fields as $field => $enabled):
+			$fieldname = str_replace(' ','', $field);
+			if($enabled && isset($form_state['values']["cc_$fieldname"])):
+				$fields[$fieldname] = $form_state['values']["cc_$fieldname"];
+			endif;
+		endforeach;
+	endif;
+
+	$user_email = $form_state['values']['cc_email'];
+
+	$email_format = $default_subscribe_format;
+	if($show_format_choice):
+		$email_format = $form_state['values']['cc_email_format'];
+	endif;
+
+	$fields['EmailType'] = $email_format;
+
+	$cc->set_action_type('contact'); /* important, tell CC that the contact made this action */
+	$contact = $cc->query_contacts($user_email);
+
+	$lists = array_keys($lists);
+
+	if($contact):
+		form_set_error('cc_email', t('Your email address is already subscribed'));
+	else:
+		$status = $cc->create_contact($user_email, $lists, $fields);
+
+		if($status):
+			if(!$redirect_to):
+				drupal_set_message(t('Success, you are now subscribed to our mailing list'));
+			endif;
+		else:
+			form_set_error('cc_email', t('Sorry, there was a problem, please ensure your details are valid and try again'));
+		endif;
+
+	endif;
+
+	$form_state['redirect'] = $redirect_to;
+	return;
+}
+
+
+/**
+ * Cron job to handle syncing unsubscribers
+ */
+function constant_contact_cron()
+{
+	$sync_users = variable_get('cc_sync_unsubscribed_users',CC_SYNC_UNSUBSCRIBED_USERS);
+
+	if(!$sync_users):
+		return; /* syncing is disabled */
+	endif;
+
+	$cc = constant_contact_create_object();
+
+	if(!is_object($cc)):
+		return;
+	endif;
+
+	// measure execution time of this cron job
+	timer_start('cc_cron');
+
+	//variable_set('cc_sync_last_run',0); /* for testing only */
+	$date_format = 'Y-m-d\TH:i:s.000\Z';
+	$sync_last_run = variable_get('cc_sync_last_run',0);
+
+	if(!$sync_last_run):
+		// set to current time
+		$sync_last_run = date($date_format, strtotime('-1 month')); /* default to one month ago */
+	endif;
+
+	$all_users = array();
+	$operation_failed = false;
+
+	// get removed users since the date above
+	$action = "contacts?updatedsince=$sync_last_run&listtype=removed";
+	$users = $cc->get_contacts($action);
+
+	if($users !== false):
+		$all_users = array_merge($users, $all_users);
+	else:
+		$operation_failed = true;
+	endif;
+
+	// if we have other pages grab them too
+	if(!empty($cc->contact_meta_data->next_page)):
+		while($cc->contact_meta_data->next_page != ''):
+			$action = $cc->contact_meta_data->next_page;
+			$users = $cc->get_contacts($action);
+
+			if($users !== false):
+				$all_users = array_merge($users, $all_users);
+			else:
+				$operation_failed = true;
+			endif;
+		endwhile;
+	endif;
+
+	// get unsubscribed users since the date above
+	$action = "contacts?updatedsince=$sync_last_run&listtype=do-not-mail";
+	$users = $cc->get_contacts($action);
+
+	if($users !== false):
+		$all_users = array_merge($users, $all_users);
+	else:
+		$operation_failed = true;
+	endif;
+
+	// if we have other pages grab them too
+	if(!empty($cc->contact_meta_data->next_page)):
+		while($cc->contact_meta_data->next_page != ''):
+			$action = $cc->contact_meta_data->next_page;
+			$users = $cc->get_contacts($action);
+
+			if($users !== false):
+				$all_users = array_merge($users, $all_users);
+			else:
+				$operation_failed = true;
+			endif;
+		endwhile;
+	endif;
+
+	// if no errors occured
+	if($operation_failed === false):
+
+		$users_synced = 0;
+		// Loop users and change their local settings to unsubscribed
+		foreach($all_users as $k => $v):
+			$user = user_load(array('mail' => $v['EmailAddress']));
+
+			if($user !== false):
+				$newfields = array('cc_newsletter_lists' => array());
+
+				if($v['Status'] != 'Removed'):
+					$newfields['cc_newsletter'] = 0;
+				endif;
+
+				user_save($user, $newfields, 'account');
+				++$users_synced;
+			endif;
+		endforeach;
+
+		// reset synce_last_run variable to the current date and time
+		variable_set('cc_sync_last_run', date($date_format));
+
+		if($users_synced):
+			watchdog('Constant Contact', 'Successfully synchronized %users unsubscribed user(s) in %timetaken seconds.', array('%users' => $users_synced, '%timetaken' => timer_read('cc_cron')));
+		endif;
+
+	else:
+		 watchdog('Constant Contact', 'Failed to synchronize unsubscribed users %error.', array('%error' => $cc->last_error), WATCHDOG_ERROR);
+	endif;
+
+	timer_stop('cc_cron');
+}
+
+/**
+ * This function is used to determine what the last error was and displays a friendly error message
+ */
+function constant_contact_display_last_error($status_code = 0)
+{
+	$last_error = '';
+	$status_code = intval($status_code);
+
+	if(!$status_code):
+		return $last_error;
+	endif;
+
+	$last_error = 'Sorry there was a problem processing your request, the error given was: ';
+
+	switch($status_code):
+		case 400: /* Invalid Request */
+			$last_error .= 'Invalid Request';
+		break;
+		case 401: /* Unauthorized */
+			$last_error .= 'Unauthorized';
+		break;
+		case 404: /* Page Not Found */
+			$last_error .= 'Page Not Found';
+		break;
+		case 409: /* Conflict */
+			$last_error .= 'Conflict';
+		break;
+		case 415: /* Unsupported Media Type */
+			$last_error .= 'Unsupported Media Type';
+		break;
+		case 500: /* Internal Server Error */
+			$last_error .= 'Internal Server Error';
+		break;
+		default: /* Unknown Error */
+			$last_error .= 'Unknown Error';
+		break;
+	endswitch;
+
+	watchdog('Constant Contact','%error',array('%error' => $last_error),WATCHDOG_ERROR);
+	drupal_set_message($last_error, 'error');
+}
+
+/**
+ * Format field mappings into array
+ */
+function constant_contact_build_field_mappings()
+{
+	if(isset($GLOBALS['cc_extra_field_mappings'])):
+		return $GLOBALS['cc_extra_field_mappings'];
+	endif;
+
+	$mappings = variable_get('cc_extra_field_mappings',array());
+	$field_mappings = explode(',', $mappings);
+
+	$GLOBALS['cc_extra_field_mappings'] = array();
+
+	if($field_mappings):
+	foreach($field_mappings as $mapping):
+		$bits = explode(':', $mapping);
+
+		if(is_array($bits) && isset($bits[0], $bits[1])):
+			$GLOBALS['cc_extra_field_mappings'][trim($bits[0])] = trim($bits[1]);
+		endif;
+	endforeach;
+	endif;
+
+	return $GLOBALS['cc_extra_field_mappings'];
+}
+
+/**
+ * Helper method, creates an object of the cc class
+ * Used in many functions throughout
+ * Handles startup errors
+ */
+function constant_contact_create_object()
+{
+	global $user;
+	$username = variable_get('cc_username','');
+	$password = variable_get('cc_password','');
+
+	module_load_include('php', 'constant_contact', 'class.cc');
+	$cc = new cc($username, $password);
+
+	if(!$username || !$password):
+		if(isset($user->uid) && $user->uid):
+			if(in_array('Administrator', $user->roles) || intval($user->uid) === 1):
+				drupal_set_message(t('Please enter your Constant Contact account username and password'), 'error');
+			endif;
+		endif;
+		watchdog('Constant Contact','Account settings not entered',array(),WATCHDOG_ERROR);
+		return false;
+	endif;
+
+	if(is_object($cc)):
+		// we have an object
+		return $cc;
+	elseif($cc->http_response_code):
+		// oops, problem occured and we have an error code
+		$error = $cc->http_get_response_code_error($cc->http_response_code);
+		watchdog('Constant Contact','%error',array('%error' => $error),WATCHDOG_ERROR);
+
+		// if we get an unauthorized 401 error code reset the username and password
+		// if we don't do this the CC account will be temporarily blocked after a few tries
+		if(intval($cc->http_response_code) === 401):
+			variable_set('cc_username','');
+			variable_set('cc_password','');
+		endif;
+
+		if(isset($user->uid) && $user->uid):
+			if(in_array('Administrator', $user->roles) || intval($user->uid) === 1):
+				drupal_set_message("Constant Contact - $error", 'error');
+			endif;
+		endif;
+	endif;
+
+	// return false for everyone else, admin will see an error but users won't
+	// other functions will fail silently
+	return false;
+}
+
+
+/**
+ * sort the lists based on the user defined sort field
+ *
+ * @access 	private
+ */
+function constant_contact_sort_lists($a, $b)
+{
+	$sort_field = variable_get('cc_contact_list_sort_order', CC_CONTACT_LIST_SORT_ORDER);
+
+	if($sort_field == 'SortOrder' || $sort_field == 'id'):
+		if(!isset($a[$sort_field], $b[$sort_field]) || $a[$sort_field] == $b[$sort_field]):
+			return 0;
+		endif;
+		return ($a[$sort_field] < $b[$sort_field]) ? -1 : 1;
+	elseif($sort_field == 'Name'):
+		return strcmp($a[$sort_field], $b[$sort_field]);
+	endif;
+
+}
+
+/**
+ * Helpful function to get the contact lists
+ */
+function constant_contact_get_lists(&$cc, $exclude = 3)
+{
+    // if some cached data exists use it
+    if($cached = cache_get('cc_lists', 'cache')):
+        return $cached->data;
+    endif;
+
+	$_lists = $cc->get_all_lists('lists', $exclude, 'constant_contact_sort_lists');
+
+	$lists = array();
+
+	if($_lists):
+	foreach($_lists as $k => $v):
+		$lists[$v['id']] = $v['Name'];
+	endforeach;
+	endif;
+
+    // save to the cache
+    $expire = variable_get('cc_lists_cache_expire', CC_CONTACT_LISTS_CACHE_EXPIRE);
+    cache_set('cc_lists', $lists, 'cache', time() + $expire);
+
+	return $lists;
+}

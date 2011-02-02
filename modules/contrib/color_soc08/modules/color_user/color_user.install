@@ -1,0 +1,47 @@
+<?php
+// $Id: color_user.install,v 1.1.2.1 2008/11/30 00:47:21 skiquel Exp $
+
+/**
+ * Implementation of hook_install().
+ */
+function color_user_install() {
+  drupal_install_schema('color_user');
+
+  variable_set('color_unregistered_scheme', 0);
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function color_user_uninstall() {
+  drupal_uninstall_schema('color_user');
+
+  variable_del('color_unregistered_scheme');
+
+  // Refresh blocks.
+  cache_clear_all(NULL, 'cache_block');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function color_user_schema() {
+  $schema['color_user'] = array(
+    'description' => t("Users's scheme selection(s)."),
+    'fields' => array(
+      'uid' => array(
+        'description' => t('The {users}.uid that owns this color set; initially, this is the user that created it.'),
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'scheme_id' => array(
+        'description' => t('ID of the color scheme user has selected.'),
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('uid'),
+  );
+
+  return $schema;
+}

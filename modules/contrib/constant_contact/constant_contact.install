@@ -1,0 +1,198 @@
+<?php
+// $Id: constant_contact.install,v 1.15 2010/03/28 12:02:30 justphp Exp $
+module_load_include('php', 'constant_contact', 'constant_contact.config');
+
+/**
+ * @file
+ */
+
+/**
+ * Implementation of hook_requirements().
+ * This helps admin know if the module is functioning correctly.
+ */
+function constant_contact_requirements($phase)
+{
+	$requirements = array();
+
+	// try to change the allow_url_fopen setting
+	@ini_get('allow_url_fopen', 1);
+
+	if($phase == 'runtime'):
+		// running the module...
+	else:
+		// installing...
+		if(!extension_loaded('xml'))
+		{
+			$requirements['xml'] = array(
+			'value' => t('XML extension Not installed'),
+			'severity' => REQUIREMENT_ERROR,
+			'description' => t('The XML extension for PHP is missing or outdated. Please check the PHP XML documentation for information on how to correct this.'),
+			);
+			$requirements['xml']['title'] = t('Constant Contact');
+		}
+
+		if(!extension_loaded('openssl'))
+		{
+			$requirements['openssl'] = array(
+			'value' => t('openssl extension Not installed'),
+			'severity' => REQUIREMENT_ERROR,
+			'description' => t('The openssl extension for PHP is missing or outdated. Please check the PHP openssl documentation for information on how to correct this.'),
+			);
+			$requirements['openssl']['title'] = t('Constant Contact');
+		}
+		else
+		{
+			$last_error = false;
+
+			if($fp = @fsockopen('ssl://www.google.com', 443, $errno, $errstr, 120)):
+				if(fwrite($fp, $request)):
+					while(!feof($fp)):
+						if(!$this->http_response .= @fread($fp, 8192)):
+							$last_error = "Failed to read test connection to google.com";
+							break;
+						endif;
+					endwhile;
+				endif;
+				fclose($fp);
+			else:
+				$last_error = "Test connection to google.com Failed $errstr ($errno)";
+			endif;
+
+			if($last_error):
+				$requirements['ssl'] = array(
+				'value' => t('Problem with fsockopen function'),
+				'severity' => REQUIREMENT_ERROR,
+				'description' => t("We encountered a problem while trying to test the servers secure communication abilities, the test failed with the message: $last_error."),
+				);
+				$requirements['xml']['title'] = t('Constant Contact');
+			endif;
+		}
+
+		if(!ini_get('allow_url_fopen'))
+		{
+			$requirements['allow_url_fopen'] = array(
+			'value' => t('allow_url_fopen setting Not enabled'),
+			'severity' => REQUIREMENT_ERROR,
+			'description' => t('The allow_url_fopen setting is not enabled in your php.ini config file'),
+			);
+			$requirements['allow_url_fopen']['title'] = t('Constant Contact');
+		}
+	endif;
+
+	return $requirements;
+}
+
+
+/**
+ * Installs the variables we need for the module
+ */
+function constant_contact_install()
+{
+	// list of all extra fields the API supports
+	$cc_extra_fields = array(
+		'First Name',
+		'Middle Name',
+		'Last Name',
+		'Job Title',
+		'Company Name',
+		'Home Phone',
+		'Work Phone',
+		'Addr1','Addr2','Addr3',
+		'City',
+		'State Code',
+		'State Name',
+		'Country Code',
+		'Country Name',
+		'Postal Code',
+		'Sub Postal Code',
+		'Note',
+		'CustomField1',
+		'CustomField2',
+		'CustomField3',
+		'CustomField4',
+		'CustomField5',
+		'CustomField6',
+		'CustomField7',
+		'CustomField8',
+		'CustomField9',
+		'CustomField10',
+		'CustomField11',
+		'CustomField12',
+		'CustomField13',
+		'CustomField14',
+		'CustomField15',
+	);
+
+	// build the mappings
+	$fields = array();
+	foreach($cc_extra_fields as $field):
+		$fields[] = str_replace(' ', '', $field) . ":profile_" . str_replace(' ', '_', strtolower($field));
+	endforeach;
+	$mappings = implode(', ', $fields);
+
+	// set default values
+	variable_set('cc_extra_fields', $cc_extra_fields);
+	variable_set('cc_extra_field_mappings', $mappings);
+
+	// so custom modules that hook into this module will work with a weight of 100 or more
+	db_query("UPDATE {system} SET weight = 99 WHERE name = 'constant_contact'");
+}
+
+
+/**
+ * Removes the variables we have set for the module
+ */
+function constant_contact_uninstall()
+{
+	variable_del('cc_form_block_fields');
+	variable_del('cc_extra_fields');
+	variable_del('cc_extra_field_mappings');
+	variable_del('cc_register_page_method');
+	variable_del('cc_default_opt_in');
+	variable_del('cc_contact_list_sort_order');
+	variable_del('cc_subscribe_format');
+	variable_del('cc_show_format_choice');
+	variable_del('cc_signup_title');
+	variable_del('cc_signup_description');
+	variable_del('cc_lists');
+	variable_del('cc_sync_unsubscribed_users');
+	variable_del('cc_sync_last_run');
+	variable_del('cc_block_redirect_url');
+	variable_del('cc_list_selection_format');
+	variable_del('cc_block_list_selection_format');
+	variable_del('cc_block_show_list_selection');
+	variable_del('cc_block_lists');
+	variable_del('cc_email_field_position');
+    variable_del('cc_lists_cache_expire');
+}
+
+/**
+ * Implementation of hook_disable().
+ */
+function constant_contact_disable()
+{
+	drupal_set_message(t('The Constant Contact module has been disabled, to upgrade please uninstall.'));
+}
+
+/**
+ * Implementation of hook_enable().
+ */
+function constant_contact_enable()
+{
+	drupal_set_message(t('The Constant Contact module has been enabled, please visit the settings page to configure your account details.'));
+}
+
+/**
+ * Upgrade for drupal 6.x-2.1
+ */
+function constant_contact_update_6201()
+{
+    // convert old username and password for RC2 or below
+    $username = variable_get('cc-username', '');
+    $password = variable_get('cc-password', '');
+
+    if($username && $password):
+        variable_set('cc_username', $username);
+        variable_set('cc_password', $password);
+    endif;
+}

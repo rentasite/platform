@@ -1,0 +1,10 @@
+5.x-1.0: First version of ScrollText.
+5.x-1.1: Select any node types
+       : Scrolling speed, delay, width, height
+	   : Scroll direction: left, right, up, down
+	   : Scroll type: scroll, slide, bouncing
+6.x-1-dev: First version of ScrollText for Drupal 6
+       : Fix bug from 5 with height 0
+       : Fix bug from 5 with only showing published version
+       : Fix for Additional line between links for up and down scroll re: http://drupal.org/node/209835
+

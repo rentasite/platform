@@ -1,0 +1,228 @@
+<?php
+// $Id: scrolltext.module,v 1.4 2009/06/12 06:26:30 thenicespider Exp $
+
+/**
+ * @file
+ * This module used for scrolling text from node title
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+ 
+function scrolltext_help($section) {
+  switch ($section) {
+    case 'admin/help#scrolltext':
+    case 'admin/modules#description':
+      return "This module used for scrolling text from node title.";
+  }
+}
+
+/**
+ * Implementation of hook_perm
+ */
+function scrolltext_perm() {
+  return array('access scrolltext','administer scrolltext');
+}
+
+/**
+ * Menu callback. Prints a listing of active nodes on the site.
+ */
+function scrolltext_menu() {
+  $items = array();
+
+  $items['admin/settings/scrolltext'] = array(
+    'title' => t('ScrollText'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('scrolltext_settings_form'),
+    'access arguments' => array('administer scrolltext'),
+    'type' => MENU_NORMAL_ITEM,
+    'description' => t("ScrollText settings")
+  );
+    
+  return $items;
+}
+
+
+/**
+ * Implementation of hook_theme()
+ */
+function scrolltext_theme() {
+  return array(
+    'scrolltext_node' => array(
+      'arguments' => array('form' => NULL),
+    ),
+  );
+}
+
+
+/**
+ */
+function scrolltext_settings_form() { 
+  $form['scrolltext_general'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('General settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => t('Remember to enable the ScrollText on Drupal !blocks . CSS id is "scrolltext" to theming ScrollText.', array('!blocks'=>l('blocks', 'admin/build/block')))
+  );
+  $form['scrolltext_general']['scrolltext_direction'] = array(
+    '#type' => 'select',
+    '#title' => t('Scroll Direction'),
+    '#default_value' => variable_get('scrolltext_direction', 'Left'),
+    '#options' => array('Left'=>'Left','Right'=>'Right','Up'=>'Up','Down'=>'Down')
+  ); 
+  $form['scrolltext_general']['scrolltext_behavior'] = array(
+    '#type' => 'select',
+    '#title' => t('Scroll Type'),
+    '#default_value' => variable_get('scrolltext_behavior', 'Scroll'),
+    '#options' => array('Scroll'=>'Scroll','Alternate'=>'Bouncing'),
+    '#description' => t('Bouncing will not run if scrol text wider than scroll width.')
+  ); 
+  $form['scrolltext_general']['scrolltext_speed'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Scroll Speed'),
+    '#default_value' => variable_get('scrolltext_speed', '10')
+  ); 
+  $form['scrolltext_general']['scrolltext_delay'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Scroll Delay (seconds)'),
+    '#default_value' => variable_get('scrolltext_delay', '0')
+  ); 
+  
+  $form['scrolltext_general']['scrolltext_width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Scroll Width'),
+    '#default_value' => variable_get('scrolltext_width', '100%')
+  ); 
+  
+  $form['scrolltext_general']['scrolltext_height'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Scroll Height'),
+    '#default_value' => variable_get('scrolltext_height', '0'),
+    '#description' => t('HEIGHT depends on scroll text length, try use 0 if the ScrollText DIRECTION does not work!')
+  ); 
+  
+  $form['scrolltext_general']['scrolltext_format'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Scroll Format'),
+    '#default_value' => variable_get('scrolltext_format', ''),
+    '#description' => t('Format of the text including size and color, style information')
+  ); 
+
+  $form['scrolltext_source'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Source settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE
+  );
+  $form['scrolltext_source']['scrolltext_nodetype'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Node Type'),
+    '#default_value' => variable_get('scrolltext_nodetype', "'page','story'"),
+    '#description' => t("<p>Get title from certain node type, i.e: 'page','story'</p>")
+  ); 
+  
+  $form['scrolltext_source']['scrolltext_count'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Title Count'),
+    '#default_value' => variable_get('scrolltext_count', '10'),
+    '#description' => t('<p>How many new title would you like to scrol? NOTE: greater number will cause you website slowly!</p>')
+  ); 
+  
+  $form['scrolltext_source']['scrolltext_link'] = array(
+    '#type' => 'checkbox',
+    '#checked_value' => 1,
+    '#title' => t('Link Title to its node'),
+    '#default_value' => variable_get('scrolltext_link', 0)
+  ); 
+
+  return system_settings_form($form);
+}
+
+/**
+ * Implementation of hook_block().
+ *
+ */
+function scrolltext_block($op = 'list', $delta = 0) {
+global $user; 
+  if ($op == 'list') 
+  {
+    $blocks[0]['info'] = 'ScrollText';
+    
+    
+    return $blocks;
+  }
+  
+  if ($op == 'view') 
+  {
+    switch($delta) {
+      case 0:
+      $path = drupal_get_path('module', 'scrolltext');
+      $library_path = libraries_get_path('jscroller2');
+      $scrolltext_direction= variable_get('scrolltext_direction', 'Left');
+      $scrolltext_behavior = variable_get('scrolltext_behavior', 'Scroll');
+      $scrolltext_width    = variable_get('scrolltext_width', '100%');
+      $scrolltext_height   = variable_get('scrolltext_height', '0');
+      $scrolltext_format   = variable_get('scrolltext_format', '');
+      $scrolltext_speed    = variable_get('scrolltext_speed', '10');
+      $scrolltext_delay    = variable_get('scrolltext_delay', '0');
+
+      $scrolltext_nodetype = variable_get('scrolltext_nodetype', "'page','story'");
+      $scrolltext_count    = variable_get('scrolltext_count', '10');
+      $scrolltext_link    = variable_get('scrolltext_link', 0);
+
+      $sql = "SELECT n.title, n.nid FROM {node} n WHERE n.status = 1 and n.type IN ($scrolltext_nodetype) "
+        ."ORDER BY n.created DESC LIMIT $scrolltext_count";	
+      $results = db_query($sql);
+
+      if ($results)
+      {
+        drupal_add_js($library_path .'/jscroller2.js');
+        drupal_add_css($library_path .'/jscroller2.css');
+
+        $block['subject'] = t('<!-- none -->');
+        $block['content'] = '';
+        $scroll_text = '';
+        while ( $data = db_fetch_object($results) ) 
+        {
+          if ($scrolltext_link) {
+            $scroll_text .= l("$data->title","node/$data->nid", array('attributes' => array('style' => $scrolltext_format))) . str_repeat('&nbsp;',5);
+            if ($scrolltext_direction == 'Up' or $scrolltext_direction == 'Down')  $scroll_text .= "<br />\n"; 
+          } else {
+            $scroll_text .= "<font style='$scrolltext_format'>$data->title</font>";
+            $scroll_text .= l(" Read more","node/$data->nid"). str_repeat('&nbsp;',5);
+            if ($scrolltext_direction == 'Up' or $scrolltext_direction == 'Down')  $scroll_text .= "<br />\n"; 
+          }
+        }
+        if ($scrolltext_height == 0)
+          $scrolltext_height = '1.5em';
+        else
+          $scrolltext_height .= 'px';
+
+        if ($scrolltext_delay == 0)
+          $scrolltext_delay = '';
+        else
+          $scrolltext_delay = "jscroller2_delay-$scrolltext_delay";
+
+        $behavior = '';
+        switch($scrolltext_behavior) {
+          case 'Scroll':
+            $behavior = '';
+          break;
+          case 'Alternate':
+            $behavior = 'jscroller2_alternate';
+          break;
+        }
+        $block['content']  = 
+          "<div id='scrolltext' style='height: $scrolltext_height; width: $scrolltext_width'>"
+            ."<div id='scroller' class='jscroller2_" . strtolower($scrolltext_direction) . " jscroller2_speed-$scrolltext_speed" . 0 . " $scrolltext_delay $behavior'>"
+              .$scroll_text
+            ."</div>"
+          ."</div>";
+      }
+      break;
+    }
+    return $block;
+  }
+}

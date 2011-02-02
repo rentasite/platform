@@ -1,0 +1,14 @@
+
+; $Id: foxycart.info,v 1.1 2010/03/09 03:09:54 kilogauss Exp $ 
+
+name = FoxyCart
+description = Provides integration of <a href="http://affiliate.foxycart.com/idevaffiliate.php?id=165">FoxyCart</a> with Drupal
+core = 6.x
+
+
+; Information added by drupal.org packaging script on 2010-06-13
+version = "6.x-1.1"
+core = "6.x"
+project = "foxycart"
+datestamp = "1276459808"
+

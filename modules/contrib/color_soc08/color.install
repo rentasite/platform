@@ -1,0 +1,257 @@
+<?php
+// $Id: color.install,v 1.10.2.12 2008/11/28 14:20:12 skiquel Exp $
+
+function color_requirements($phase) {
+  $requirements = array();
+
+  if ($phase == 'runtime') {
+    // Check GD library
+    if (function_exists('imagegd2')) {
+      $info = gd_info();
+      $requirements['gd'] = array(
+        'value' => $info['GD Version'],
+      );
+
+      // Check PNG support
+      if (function_exists('imagecreatefrompng')) {
+        $requirements['gd']['severity'] = REQUIREMENT_OK;
+      }
+      else {
+        $requirements['gd']['severity'] = REQUIREMENT_ERROR;
+        $requirements['gd']['description'] = t('The GD library for PHP is enabled, but was compiled without PNG support. Please check the <a href="@url">PHP image documentation</a> for information on how to correct this.', array('@url' => 'http://www.php.net/manual/en/ref.image.php'));
+      }
+    }
+    else {
+      $requirements['gd'] = array(
+        'value' => t('Not installed'),
+        'severity' => REQUIREMENT_ERROR,
+        'description' => t('The GD library for PHP is missing or outdated. Please check the <a href="@url">PHP image documentation</a> for information on how to correct this.', array('@url' => 'http://www.php.net/manual/en/ref.image.php')),
+      );
+    }
+    $requirements['gd']['title'] = t('GD library');
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function color_install() {
+  drupal_install_schema('color', 'color_schemes');
+
+  variable_set('color_hook_preview', 0);
+  variable_set('color_hook_scheme_snippet', 0);
+  variable_set('color_hook_validator', 0);
+  variable_set('color_modify_premade_schemes', 0);
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function color_uninstall() {
+  drupal_uninstall_schema('color', 'color_schemes');
+
+  module_load_include('inc', 'color', 'color.database');
+  module_load_include('inc', 'color', 'color.misc');
+
+  $themes = color_list_themes(TRUE);
+  foreach ($themes as $theme) {
+    db_query("DELETE FROM {variable} WHERE name LIKE 'color_%s%'", $theme->name);
+    db_query("DELETE FROM {variable} WHERE name LIKE 'theme_color_%s%'", $theme->name);
+  }
+
+  variable_del('color_hook_preview');
+  variable_del('color_inc_scheme_snippet');
+  variable_del('color_inc_validator');
+  variable_del('color_modify_premade_schemes');
+
+  color_rm_dir(file_directory_path() .'/color');
+}
+
+function color_schema() {
+  // Currently, schema 1 is the only schema we have. As we make updates,
+  // we might either create a new schema 2 or make adjustments here.
+  return color_schema_1();
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function color_schema_1() {
+  $schema['color'] = array(
+    'description' => t('Stores color theme information for color-enabled themes'),
+    'fields' => array(
+      'id' => array(
+        'description' => t('ID of the theme'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => t('The name of content being stored.'),
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'description' => t('The type of element being themed/colored. (theme, module, etc)'),
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'fields' => array(
+        'description' => t('The fields.'),
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'replacement methods' => array(
+        'description' => t('What replacement methods to use, and their instructions, if requested.'),
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'premade schemes' => array(
+        'description' => t('Premade schemes defined in color config file.'),
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'images' => array(
+        'description' => t('Image coords and fill options defined in color config file'),
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'stylesheets' => array(
+        'description' => t('Stylesheet(s) to have replaced colors'),
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'default scheme' => array(
+        'description' => t('The default scheme after it\'s been generated.'),
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'reference scheme' => array(
+        'description' => t('Reference scheme, for use by replacement methods such as shift. Given in the ID of the scheme.'),
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'blend target' => array(
+        'description' => t('A hex (i.e. \'#ffffff\') of the color used by algorithms to blend into.'),
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'preview' => array(
+        'description' => t('Temporary column for storing preview info for a theme'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'idname' => array('name'),
+    ),
+  );
+
+  $schema['color_schemes'] = array(
+    'description' => t('Stores the actual color schemes'),
+    'fields' => array(
+      'id' => array(
+        'description' => t('ID of the scheme'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => t('The name of scheme.'),
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'theme' => array(
+        'description' => t('ID of theme this scheme is for.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'hex' => array(
+        'description' => t('Hex values for the scheme.'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'path' => array(
+        'description' => t('Path to the scheme\'s file folder.'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'stylesheets' => array(
+        'description' => t('Stylesheets'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'images' => array(
+        'description' => t('Images'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'screenshot' => array(
+        'description' => t('Screenshot, if applicable.'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'logo' => array(
+        'description' => t('Logo file, if applicable.'),
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'status' => array(
+        'description' => t('0: Pre-made, 1: Custom/Webmaster-made'),
+        'type' => 'int',
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'namescheme' => array('name', 'theme'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Update a site to Drupal 6! Contains a bit of special code to detect
+ * if you've been running a beta version or something.
+ */
+function color_update_6000() {
+  $ret = array();
+  if (db_table_exists('color')) {
+    return $ret;
+  }
+
+  // This is mostly the same as drupal_install_schema, but it forces
+  // drupal_schema_1 rather than the default schema. This will be important
+  // if we have table updates.
+  $schema = color_schema();
+  _drupal_initialize_schema('color', $schema);
+
+  foreach ($schema as $name => $table) {
+    db_create_table($ret, $name, $table);
+  }
+  return $ret;
+}

@@ -1,0 +1,13 @@
+; $Id: color_user.info,v 1.1.2.2 2009/04/27 06:49:21 skiquel Exp $
+
+name = User schemes
+description = Allows users to pick schemes.
+package = Style
+core = 6.x
+dependencies[] = color
+; Information added by drupal.org packaging script on 2010-07-11
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "color_soc08"
+datestamp = "1278833730"
+
