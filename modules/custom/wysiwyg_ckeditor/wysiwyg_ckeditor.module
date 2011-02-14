@@ -45,7 +45,7 @@ function get_bars(){
   $bars[] = array('Outdent', 'Indent', 'Blockquote', 'CreateDiv');
   $bars[] = array('JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock');
   $bars[] = array('Link', 'Unlink', 'Anchor');
-  $bars[] = array('Image', 'Flash', 'Table', 'HorizontalRule', 'Smiley', 'SpecialChar', 'break');
+  $bars[] = array('Image', 'Flash', 'media', 'Table', 'HorizontalRule', 'Smiley', 'SpecialChar', 'break');
   $bars[] = array('Styles', 'Format', 'Font', 'FontSize');
   $bars[] = array('TextColor', 'BGColor');
   $bars[] = array('Maximize', 'ShowBlocks');
