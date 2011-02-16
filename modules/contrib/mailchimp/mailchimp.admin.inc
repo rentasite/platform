@@ -26,7 +26,7 @@ function mailchimp_admin_settings() {
       '#default_value' => variable_get('mailchimp_api_key', ''),
       '#description' => t('The API key for your MailChimp account. Get or generate a valid API key at your !apilink.', array('!apilink' => l(t('MailChimp API Dashboard'), 'http://admin.mailchimp.com/account/api')))
   );
-  
+
   // only show the list selection forms if account info provided
   $api_key = variable_get('mailchimp_api_key', FALSE);
   if ($api_key) {
@@ -172,10 +172,6 @@ function mailchimp_admin_settings() {
         $form['cron'] = array(
           '#type' => 'fieldset',
           '#title' => t('Mailchimp Cron'),
-        );
-        $form['cron']['info'] = array(
-          '#value' => t('Updates to Mailchimp can be done when the user is added or edited, or deferred until the next cron run. Deferring these updates to cron will speed up the user interface when editing users. You need to ensure cron is running correctly, and that it keeping up with the number of user edits on your site.<br /><strong>There are currently !count users with pending updates in the queue.</strong>', 
-            array('!count' => db_query('SELECT COUNT(*) FROM {mailchimp_user} WHERE status = \':status\'', array(':status' => MAILCHIMP_USERSTATUS_PENDING))->fetchField())),
         );
         $form['cron']['mailchimp_cron'] = array(
             '#type'           => 'checkbox',
