@@ -134,7 +134,7 @@ function mailchimp_user_update(&$edit, $account, $category) {
  */
 function mailchimp_subscribe_auth_form($form, $form_state, $account, $standalone = TRUE, $list = NULL) {
   if ($q = _mailchimp_get_api_object()) {
-    if ($account->uid) {
+    if (isset($account->uid) && $account->uid) {
       $form['uid'] = array(
         '#type' => 'hidden',
         '#value' => $account->uid
@@ -171,7 +171,7 @@ function mailchimp_auth_newsletter_form(&$form, $list, $account, $q) {
 
   // ignore required lists, handled by hook_user
   if ($list->listtype !== MAILCHIMP_LISTTYPE_REQUIRED) {
-    if ($account && $account->uid) {
+    if ($account && isset($account->uid) && $account->uid) {
       $memberinfo = $q->listMemberInfo($list->id, $account->mail);
       $is_subscribed = $memberinfo['status'] == 'subscribed';
       $default_value = $is_subscribed;
@@ -245,7 +245,7 @@ function mailchimp_subscribe_auth_form_submit($form, &$form_state) {
     else {
       $account = $form_state['user'];
     }
-    
+
     $lists = _mailchimp_get_available_lists($account);
     foreach ($lists as $list) {
       // ignore required lists, they are handled via hook_user
@@ -260,7 +260,7 @@ function mailchimp_subscribe_auth_form_submit($form, &$form_state) {
         elseif ($selected) {
           // subscribe the user if they are not previously subscribed or update existing subscriptions
           $merge_vars = _mailchimp_load_user_list_mergevars($account->uid, $list->id, $q->listMergeVars($list->id));
-          
+
           // include updated email address if already subscribed
           if (!empty($form_state['values']['mail']) && $is_subscribed) {
             $merge_vars['EMAIL'] = $form_state['values']['mail'];
@@ -733,7 +733,7 @@ function mailchimp_mailchimp_merge_keys() {
     if (!empty($categories)) {
       foreach ($categories as $category) {
         $result = _profile_get_fields($category['name']);
-        foreach ($result as $field) {          
+        foreach ($result as $field) {
           $out[$field->name] = t('Profile: !cat - !field', array('!cat' => $field->category, '!field' => $field->title));
         }
       }
@@ -892,7 +892,7 @@ function _mailchimp_subscribe_user($list, $email, $merge_vars, $message = TRUE, 
   }
   else {
     watchdog('mailchimp', 'A problem occurred subscribing @email to list @list. Message: @msg', array(
-      '@email' => $merge_vars['EMAIL'], 
+      '@email' => $merge_vars['EMAIL'],
       '@list' => $list->name,
       '@msg' => $q->errorMessage), WATCHDOG_WARNING);
   }
